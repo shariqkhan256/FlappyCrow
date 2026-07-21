@@ -4,12 +4,15 @@ import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -118,6 +121,7 @@ data class BackgroundBat(
 @Composable
 fun FlappyCrowGame(
     selectedAccessory: String,
+    highScore: Int = 0,
     isSoundEnabled: Boolean,
     isVibrationEnabled: Boolean,
     onGameOver: (score: Int, coins: Int) -> Unit,
@@ -650,70 +654,101 @@ fun FlappyCrowGame(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Score & Coins
-            Column {
+            // Left: Score & Best floating card with neon borders
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Navy2Color.copy(alpha = 0.75f))
+                    .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.4f)), RoundedCornerShape(16.dp))
+            ) {
                 Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "SCORE: ",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            color = NightOnBackground,
-                            fontWeight = FontWeight.Bold
+                        text = "SCORE ",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = AmethystColor,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
                         )
                     )
                     Text(
                         text = "$score",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            color = NightSecondary,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 24.sp
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = CyanColor,
+                            fontWeight = FontWeight.Black
                         )
                     )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    // Small golden coin icon
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(NightTertiary)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
                     Text(
-                        text = "COINS: ",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = NightOnBackground,
-                            fontWeight = FontWeight.Bold
+                        text = "BEST ",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = DimColor,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
                         )
                     )
                     Text(
-                        text = "$coinsCollected",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = NightTertiary,
-                            fontWeight = FontWeight.Bold
+                        text = "${max(score, highScore)}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = GoldColor,
+                            fontWeight = FontWeight.Black
                         )
                     )
                 }
             }
 
-            // Right: Pause Control
-            IconButton(
-                onClick = { isPaused = !isPaused },
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(NightSurface)
-                    .size(44.dp)
-                    .testTag("pause_button")
+            // Right: Coins floating pill + Pause Control
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                    contentDescription = "Pause Game",
-                    tint = NightSecondary
-                )
+                // Coins pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Navy2Color.copy(alpha = 0.75f))
+                        .border(BorderStroke(1.dp, GoldColor.copy(alpha = 0.3f)), RoundedCornerShape(12.dp))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(GoldColor)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "$coinsCollected",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = GoldColor,
+                                fontWeight = FontWeight.Black
+                            )
+                        )
+                    }
+                }
+
+                // Pause Button
+                IconButton(
+                    onClick = { isPaused = !isPaused },
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Navy2Color.copy(alpha = 0.8f))
+                        .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.4f)), CircleShape)
+                        .size(42.dp)
+                        .testTag("pause_button")
+                ) {
+                    Icon(
+                        imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                        contentDescription = "Pause Game",
+                        tint = CyanColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 
@@ -722,14 +757,15 @@ fun FlappyCrowGame(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f))
+                    .background(Color.Black.copy(alpha = 0.65f))
                     .clickable { /* swallow clicks */ },
                 contentAlignment = Alignment.Center
             ) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = NightSurface),
+                    colors = CardDefaults.cardColors(containerColor = Navy2Color),
                     modifier = Modifier.width(280.dp),
-                    shape = MaterialTheme.shapes.large
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.5.dp, PurpleColor.copy(alpha = 0.6f))
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -738,32 +774,35 @@ fun FlappyCrowGame(
                         Text(
                             text = "GAME PAUSED",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = NightPrimary
+                                fontWeight = FontWeight.Black,
+                                color = MoonColor,
+                                letterSpacing = 1.sp
                             )
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Score so far: $score",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = NightOnSurface)
+                            style = MaterialTheme.typography.bodyMedium.copy(color = DimColor)
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Button(
                                 onClick = { restartGame() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
-                                modifier = Modifier.weight(1f)
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray.copy(alpha = 0.3f)),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("RESTART", style = MaterialTheme.typography.bodyMedium)
+                                Text("RESTART", style = MaterialTheme.typography.bodyMedium.copy(color = MoonColor, fontWeight = FontWeight.Bold))
                             }
                             Button(
                                 onClick = { isPaused = false },
-                                colors = ButtonDefaults.buttonColors(containerColor = NightSecondary),
-                                modifier = Modifier.weight(1f)
+                                colors = ButtonDefaults.buttonColors(containerColor = MagentaColor),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("RESUME", style = MaterialTheme.typography.bodyMedium)
+                                Text("RESUME", style = MaterialTheme.typography.bodyMedium.copy(color = MoonColor, fontWeight = FontWeight.Bold))
                             }
                         }
                     }

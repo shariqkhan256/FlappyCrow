@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,7 +47,11 @@ import com.example.data.database.UserStats
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.absoluteValue
 import kotlin.math.sin
+import kotlin.math.cos
+import kotlin.math.PI
+import kotlin.random.Random
 
 // --- SCREEN 1: MAIN MENU ---
 @Composable
@@ -54,26 +60,25 @@ fun MainMenuScreen(
     onNavigate: (GameScreen) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Beautiful pulsing/bobbing animation for Coco on the menu
     val infiniteTransition = rememberInfiniteTransition(label = "menu_bobbing")
     val bobbingOffset by infiniteTransition.animateFloat(
-        initialValue = -10f,
-        targetValue = 10f,
+        initialValue = -12f,
+        targetValue = 12f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = EaseInOutSine),
+            animation = tween(1800, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
         ),
         label = "bobbing"
     )
 
-    val wingAngle by infiniteTransition.animateFloat(
-        initialValue = -20f,
-        targetValue = 20f,
+    val starsOpacity by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(400, easing = EaseInOutQuad),
+            animation = tween(1200, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "wing_flap"
+        label = "twinkle"
     )
 
     Box(
@@ -81,122 +86,151 @@ fun MainMenuScreen(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(NightBackground, Color(0xFF160D34))
+                    colors = listOf(VoidColor, NightColor)
                 )
             )
             .statusBarsPadding()
             .navigationBarsPadding(),
         contentAlignment = Alignment.Center
     ) {
-        // Decorative background stars
+        // Starry Night and Large Moon Background
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // Draw a huge soft glowing yellow moon in top-left
+            val cx = size.width
+            val cy = size.height * 0.25f
+            val r = 130f * density
+
+            // 1. Twinkling Stars
+            val starPositions = listOf(
+                Offset(size.width * 0.15f, size.height * 0.12f),
+                Offset(size.width * 0.35f, size.height * 0.08f),
+                Offset(size.width * 0.78f, size.height * 0.15f),
+                Offset(size.width * 0.25f, size.height * 0.35f),
+                Offset(size.width * 0.88f, size.height * 0.45f),
+                Offset(size.width * 0.08f, size.height * 0.55f),
+                Offset(size.width * 0.65f, size.height * 0.28f),
+                Offset(size.width * 0.45f, size.height * 0.52f)
+            )
+            starPositions.forEachIndexed { i, pos ->
+                drawCircle(
+                    color = SparkleWhite.copy(alpha = if (i % 2 == 0) starsOpacity else 1f - starsOpacity),
+                    radius = (2f + (i % 3)) * density,
+                    center = pos
+                )
+            }
+
+            // 2. Large Moon
             drawCircle(
-                color = NightTertiary.copy(alpha = 0.08f),
-                radius = 120f * density,
-                center = Offset(80f * density, 100f * density)
+                color = AmethystColor.copy(alpha = 0.05f),
+                radius = r + 40f * density,
+                center = Offset(cx * 0.5f, cy + 40f * density)
             )
             drawCircle(
-                color = Color(0xFFFFFAD6).copy(alpha = 0.4f),
-                radius = 50f * density,
-                center = Offset(80f * density, 100f * density)
+                color = MoonColor.copy(alpha = 0.12f),
+                radius = r,
+                center = Offset(cx * 0.5f, cy + 40f * density)
             )
         }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp)
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 32.dp)
         ) {
-            // High score banner
-            Surface(
-                color = NightSurface.copy(alpha = 0.8f),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, NightSecondary.copy(alpha = 0.5f)),
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.EmojiEvents,
-                        contentDescription = "High Score",
-                        tint = NightTertiary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "BEST SCORE: ",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = NightOnSurface.copy(alpha = 0.8f)
-                        )
-                    )
-                    Text(
-                        text = "${stats.highScore}",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            color = NightSecondary
-                        )
-                    )
-                }
-            }
+            // Header kicker
+            Text(
+                text = "MOBILE ARCADE ADVENTURE",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    color = AmethystColor.copy(alpha = 0.8f),
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 3.sp
+                ),
+                modifier = Modifier.padding(top = 16.dp)
+            )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Game Title with Neon text effect
             Text(
-                text = "FLAPPYCROW",
-                style = MaterialTheme.typography.displayMedium.copy(
+                text = "FlappyCrow",
+                style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Black,
-                    color = NightPrimary,
-                    letterSpacing = 6.sp,
+                    color = MoonColor,
+                    letterSpacing = 1.sp,
                     textAlign = TextAlign.Center
                 ),
-                modifier = Modifier.shadow(8.dp, clip = false)
+                modifier = Modifier.shadow(0.dp)
             )
 
             Text(
-                text = "Coco's Magical Flight",
+                text = "A Moonlit Adventure",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    color = NightSecondary,
+                    color = CyanColor,
                     letterSpacing = 2.sp
                 ),
                 modifier = Modifier.padding(top = 4.dp)
             )
 
-            Spacer(modifier = Modifier.weight(0.4f))
+            // High Score banner
+            Surface(
+                color = Navy2Color.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(100),
+                border = BorderStroke(1.dp, AmethystColor.copy(alpha = 0.4f)),
+                modifier = Modifier.padding(top = 18.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.EmojiEvents,
+                        contentDescription = "High Score",
+                        tint = GoldColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "BEST: ${stats.highScore}",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MoonColor,
+                            letterSpacing = 1.sp
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
 
             // Animated Bobbing Crow Avatar sitting on a Chimney
             Box(
                 modifier = Modifier
-                    .size(160.dp)
+                    .size(180.dp)
                     .offset(y = bobbingOffset.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val cx = size.width / 2f
                     val cy = size.height * 0.45f
-                    val r = 28f * density
+                    val r = 32f * density
 
-                    // 1. Draw Chimney base
-                    drawRect(
-                        color = Color(0xFF8B2500),
-                        topLeft = Offset(cx - 25f * density, cy + r * 0.8f),
-                        size = Size(50f * density, 60f * density)
+                    // 1. Draw Pedestal/Chimney base
+                    drawRoundRect(
+                        color = Navy2Color,
+                        topLeft = Offset(cx - 28f * density, cy + r * 0.7f),
+                        size = Size(56f * density, 48f * density),
+                        cornerRadius = CornerRadius(6f * density)
                     )
                     drawRect(
-                        color = Color(0xFF2B211E),
-                        topLeft = Offset(cx - 25f * density, cy + r * 0.8f),
-                        size = Size(50f * density, 4f * density)
+                        color = MagentaColor,
+                        topLeft = Offset(cx - 32f * density, cy + r * 0.7f),
+                        size = Size(64f * density, 8f * density)
                     )
 
                     // 2. Draw Crow Body
                     drawCircle(color = FeatherBlack, radius = r, center = Offset(cx, cy))
-                    drawCircle(color = FeatherHighlight, radius = r * 0.85f, center = Offset(cx, cy), style = Stroke(2f * density))
+                    drawCircle(color = PurpleColor, radius = r * 0.85f, center = Offset(cx, cy), style = Stroke(2.5f * density))
 
                     // Beak
                     val beak = Path().apply {
@@ -205,50 +239,49 @@ fun MainMenuScreen(
                         lineTo(cx + r * 0.8f, cy + r * 0.2f)
                         close()
                     }
-                    drawPath(beak, color = NightBeakGold)
+                    drawPath(beak, color = GoldColor)
 
                     // Eye
                     drawCircle(color = Color.White, radius = r * 0.3f, center = Offset(cx + r * 0.3f, cy - r * 0.3f))
                     drawCircle(color = Color.Black, radius = r * 0.15f, center = Offset(cx + r * 0.35f, cy - r * 0.3f))
-
-                    // Flapping Wing
-                    val wingW = r * 1.1f
-                    val wingH = r * 0.6f
-                    val wPivotX = cx - r * 0.1f
-                    val wPivotY = cy + r * 0.1f
-
-                    drawCircle(color = FeatherBlack, radius = r * 0.6f, center = Offset(wPivotX, wPivotY))
+                    drawCircle(color = CyanColor, radius = r * 0.05f, center = Offset(cx + r * 0.4f, cy - r * 0.35f))
                 }
             }
 
-            Spacer(modifier = Modifier.weight(0.6f))
+            Spacer(modifier = Modifier.weight(1f))
 
-            // Menu Buttons: Standard Rounded M3 styled Game Actions
+            // Menu Buttons: Overhauled visual hierarchy
             Column(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.fillMaxWidth(0.85f)
+                modifier = Modifier.fillMaxWidth(0.9f)
             ) {
-                Button(
-                    onClick = { onNavigate(GameScreen.Game) },
+                // Play Button (Neon Gradient)
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(MagentaColor, PurpleColor)
+                            )
+                        )
+                        .clickable { onNavigate(GameScreen.Game) }
                         .testTag("play_button"),
-                    colors = ButtonDefaults.buttonColors(containerColor = NightPrimary),
-                    shape = RoundedCornerShape(27.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+                    contentAlignment = Alignment.Center
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = NightBackground)
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MoonColor, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "START FLAPPING",
+                            text = "PLAY GAME",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = NightBackground
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MoonColor,
+                                letterSpacing = 2.sp
                             )
                         )
                     }
@@ -259,88 +292,95 @@ fun MainMenuScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     // Customize button
-                    Button(
-                        onClick = { onNavigate(GameScreen.Customize) },
+                    Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(50.dp)
+                            .clip(RoundedCornerShape(25.dp))
+                            .background(Navy2Color.copy(alpha = 0.8f))
+                            .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.4f)), RoundedCornerShape(25.dp))
+                            .clickable { onNavigate(GameScreen.Customize) }
                             .testTag("customize_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = NightSurface),
-                        shape = RoundedCornerShape(25.dp),
-                        border = BorderStroke(1.dp, NightSecondary.copy(alpha = 0.4f))
+                        contentAlignment = Alignment.Center
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.Checkroom, contentDescription = null, tint = NightSecondary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Checkroom, contentDescription = null, tint = CyanColor, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 "WARDROBE",
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = NightSecondary
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = CyanColor,
+                                    letterSpacing = 1.sp
                                 )
                             )
                         }
                     }
 
                     // Achievements button
-                    Button(
-                        onClick = { onNavigate(GameScreen.Achievements) },
+                    Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(50.dp)
+                            .clip(RoundedCornerShape(25.dp))
+                            .background(Navy2Color.copy(alpha = 0.8f))
+                            .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.4f)), RoundedCornerShape(25.dp))
+                            .clickable { onNavigate(GameScreen.Achievements) }
                             .testTag("achievements_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = NightSurface),
-                        shape = RoundedCornerShape(25.dp),
-                        border = BorderStroke(1.dp, NightSecondary.copy(alpha = 0.4f))
+                        contentAlignment = Alignment.Center
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.MilitaryTech, contentDescription = null, tint = NightTertiary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.MilitaryTech, contentDescription = null, tint = GoldColor, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 "TROPHIES",
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = NightTertiary
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = GoldColor,
+                                    letterSpacing = 1.sp
                                 )
                             )
                         }
                     }
                 }
 
-                // Settings button (large wide secondary)
-                Button(
-                    onClick = { onNavigate(GameScreen.Settings) },
+                // Settings button
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(VoidColor.copy(alpha = 0.5f))
+                        .border(BorderStroke(1.dp, DimColor.copy(alpha = 0.2f)), RoundedCornerShape(24.dp))
+                        .clickable { onNavigate(GameScreen.Settings) }
                         .testTag("settings_button"),
-                    colors = ButtonDefaults.buttonColors(containerColor = NightSurface.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(24.dp)
+                    contentAlignment = Alignment.Center
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.Settings, contentDescription = null, tint = NightOnSurface.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Settings, contentDescription = null, tint = DimColor, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "SETTINGS",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = NightOnSurface.copy(alpha = 0.7f)
+                                color = DimColor,
+                                letterSpacing = 1.sp
                             )
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -356,13 +396,17 @@ fun CustomizeScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Current equipped accessory info
     val currentSelected = stats.selectedAccessory
+    var selectedTab by remember { mutableStateOf("Hats") }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(NightBackground)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(VoidColor, NightColor)
+                )
+            )
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
@@ -380,23 +424,26 @@ fun CustomizeScreen(
                     onClick = onBack,
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(NightSurface)
+                        .background(Navy2Color.copy(alpha = 0.6f))
+                        .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.3f)), CircleShape)
+                        .size(40.dp)
                         .testTag("back_button")
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = NightSecondary
+                        tint = MoonColor
                     )
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Text(
-                    text = "COCO'S WARDROBE",
+                    text = "Coco's Closet",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Black,
-                        color = NightOnBackground
+                        color = MoonColor,
+                        letterSpacing = 1.sp
                     )
                 )
 
@@ -404,26 +451,26 @@ fun CustomizeScreen(
 
                 // Coin balance display
                 Surface(
-                    color = NightSurface,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, NightTertiary.copy(alpha = 0.6f))
+                    color = Navy2Color.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(100),
+                    border = BorderStroke(1.dp, GoldColor.copy(alpha = 0.5f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(14.dp)
+                                .size(12.dp)
                                 .clip(CircleShape)
-                                .background(NightTertiary)
+                                .background(GoldColor)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "${stats.totalCoins}",
                             style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = NightTertiary
+                                fontWeight = FontWeight.ExtraBold,
+                                color = GoldColor
                             )
                         )
                     }
@@ -432,55 +479,102 @@ fun CustomizeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Premium Preview Panel: Draw Coco with selected accessory
-            Card(
-                colors = CardDefaults.cardColors(containerColor = NightSurface),
+            // Premium Preview Panel with Glowing border and platform
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp),
-                shape = MaterialTheme.shapes.large,
-                border = BorderStroke(1.dp, NightPrimary.copy(alpha = 0.3f))
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Soft glowing moon spotlight inside wardrobe preview
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        drawCircle(
-                            color = NightPrimary.copy(alpha = 0.1f),
-                            radius = 65f * density,
-                            center = Offset(size.width / 2f, size.height / 2f)
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Navy2Color.copy(alpha = 0.9f), VoidColor)
                         )
-                    }
+                    )
+                    .border(BorderStroke(1.5.dp, PurpleColor.copy(alpha = 0.5f)), RoundedCornerShape(24.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                // Platform platform glow
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp)
+                        .width(160.dp)
+                        .height(16.dp)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(MagentaColor.copy(alpha = 0.4f), Color.Transparent)
+                            )
+                        )
+                )
 
-                    // Large mathematically drawn custom preview of Coco with equipped Hat/Scarf
-                    PreviewCrow(accessoryId = currentSelected, modifier = Modifier.size(110.dp))
+                // Mathematically drawn custom preview
+                PreviewCrow(accessoryId = currentSelected, modifier = Modifier.size(130.dp))
 
+                // "Equipped" badge
+                Surface(
+                    color = CyanColor,
+                    shape = RoundedCornerShape(100),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(14.dp)
+                ) {
                     Text(
-                        text = "Current: " + (accessories.find { it.id == currentSelected }?.name ?: "None"),
+                        text = "EQUIPPED",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = NightOnSurface.copy(alpha = 0.6f),
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Black,
+                            color = VoidColor,
+                            letterSpacing = 1.sp
                         ),
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 12.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "AVAILABLE ACCESSORIES",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = NightOnBackground.copy(alpha = 0.7f),
-                    letterSpacing = 1.5.sp
-                ),
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
+            // Tab selection (Hats, Glasses, Extras, Trails)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("Hats", "Glasses", "Extras", "Trails").forEach { tab ->
+                    val isSelected = selectedTab == tab
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) PurpleColor else Navy2Color.copy(alpha = 0.4f))
+                            .border(
+                                BorderStroke(
+                                    width = 1.dp,
+                                    color = if (isSelected) AmethystColor else AmethystColor.copy(alpha = 0.15f)
+                                ),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { selectedTab = tab },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = tab,
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) MoonColor else DimColor
+                            )
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Filter items based on selected tab
+            val filteredAccessories = when (selectedTab) {
+                "Hats" -> accessories.filter { it.id in listOf("wizard_hat", "golden_crown", "detective_hat") }
+                "Glasses" -> accessories.filter { it.id == "pilot_goggles" }
+                "Extras" -> accessories.filter { it.id == "red_scarf" }
+                else -> accessories.filter { it.id == "none" }
+            }
 
             // Grid of accessories shop items
             LazyVerticalGrid(
@@ -489,17 +583,22 @@ fun CustomizeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(accessories) { acc ->
+                items(filteredAccessories) { acc ->
                     val isEquipped = acc.id == currentSelected
                     val canAfford = stats.totalCoins >= acc.cost
 
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = NightSurface),
-                        border = BorderStroke(
-                            width = if (isEquipped) 2.dp else 1.dp,
-                            color = if (isEquipped) NightPrimary else NightOnSurface.copy(alpha = 0.15f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Navy2Color.copy(alpha = 0.6f))
+                            .border(
+                                BorderStroke(
+                                    width = if (isEquipped) 2.dp else 1.dp,
+                                    color = if (isEquipped) CyanColor else AmethystColor.copy(alpha = 0.2f)
+                                ),
+                                RoundedCornerShape(20.dp)
+                            )
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -508,18 +607,20 @@ fun CustomizeScreen(
                             // Small accessory graphic
                             Box(
                                 modifier = Modifier
-                                    .size(60.dp)
+                                    .size(76.dp)
                                     .padding(4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 PreviewAccessoryIcon(acc.id, modifier = Modifier.fillMaxSize())
                             }
 
+                            Spacer(modifier = Modifier.height(6.dp))
+
                             Text(
                                 text = acc.name,
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = NightOnSurface
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MoonColor
                                 ),
                                 textAlign = TextAlign.Center
                             )
@@ -528,36 +629,32 @@ fun CustomizeScreen(
 
                             // Interactive Purchase / Selection buttons
                             if (acc.isUnlocked) {
-                                Button(
-                                    onClick = { onSelect(acc.id) },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isEquipped) Color.Gray else NightSecondary
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(36.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isEquipped) Color.Gray.copy(alpha = 0.3f) else CyanColor)
+                                        .clickable { onSelect(acc.id) },
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = if (isEquipped) "EQUIPPED" else "EQUIP",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = NightBackground
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = if (isEquipped) MoonColor.copy(alpha = 0.5f) else VoidColor
                                         )
                                     )
                                 }
                             } else {
-                                Button(
-                                    onClick = { onBuy(acc.id) },
-                                    enabled = canAfford,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = NightTertiary,
-                                        disabledContainerColor = NightSurface.copy(alpha = 0.5f)
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(36.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (canAfford) GoldColor else Color.Gray.copy(alpha = 0.2f))
+                                        .clickable(enabled = canAfford) { onBuy(acc.id) },
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -567,14 +664,14 @@ fun CustomizeScreen(
                                             modifier = Modifier
                                                 .size(10.dp)
                                                 .clip(CircleShape)
-                                                .background(if (canAfford) NightBackground else Color.Gray)
+                                                .background(if (canAfford) VoidColor else Color.Gray)
                                         )
-                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = "${acc.cost}",
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (canAfford) NightBackground else Color.Gray
+                                            style = MaterialTheme.typography.labelLarge.copy(
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = if (canAfford) VoidColor else Color.Gray
                                             )
                                         )
                                     }
@@ -601,7 +698,11 @@ fun AchievementsScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(NightBackground)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(VoidColor, NightColor)
+                )
+            )
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
@@ -619,25 +720,38 @@ fun AchievementsScreen(
                     onClick = onBack,
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(NightSurface)
+                        .background(Navy2Color.copy(alpha = 0.6f))
+                        .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.3f)), CircleShape)
+                        .size(40.dp)
                         .testTag("back_button")
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = NightSecondary
+                        tint = MoonColor
                     )
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Text(
-                    text = "TROPHY ROOM",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Black,
-                        color = NightOnBackground
+                Column {
+                    Text(
+                        text = "Trophies",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Black,
+                            color = MoonColor,
+                            letterSpacing = 1.sp
+                        )
                     )
-                )
+                    Text(
+                        text = "COCO'S JOURNEY",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = AmethystColor,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp
+                        )
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -646,11 +760,12 @@ fun AchievementsScreen(
             val completedCount = achievements.count { it.isUnlocked }
             val progressPercent = if (achievements.isNotEmpty()) completedCount.toFloat() / achievements.size else 0f
 
-            Card(
-                colors = CardDefaults.cardColors(containerColor = NightSurface),
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                border = BorderStroke(1.dp, NightTertiary.copy(alpha = 0.25f))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Navy2Color.copy(alpha = 0.6f))
+                    .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.25f)), RoundedCornerShape(20.dp))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -658,30 +773,42 @@ fun AchievementsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "COMPLETION STATUS",
+                            text = "TOTAL PROGRESS",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = NightOnSurface.copy(alpha = 0.7f)
+                                color = DimColor,
+                                letterSpacing = 1.sp
                             )
                         )
                         Text(
-                            text = "$completedCount / ${achievements.size} UNLOCKED",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = NightTertiary
+                            text = "$completedCount / ${achievements.size}",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Black,
+                                color = GoldColor
                             )
                         )
                     }
                     Spacer(modifier = Modifier.height(10.dp))
-                    LinearProgressIndicator(
-                        progress = progressPercent,
-                        color = NightTertiary,
-                        trackColor = Color(0xFF2C244C),
+                    // Overhauled custom progress indicator with double-gradient
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(10.dp)
                             .clip(RoundedCornerShape(5.dp))
-                    )
+                            .background(VoidColor)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(progressPercent)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(CyanColor, MagentaColor)
+                                    )
+                                )
+                        )
+                    }
                 }
             }
 
@@ -695,34 +822,46 @@ fun AchievementsScreen(
                 items(achievements) { ach ->
                     val dateStr = if (ach.unlockedAt > 0) dateFormatter.format(Date(ach.unlockedAt)) else ""
 
-                    Surface(
-                        color = if (ach.isUnlocked) NightSurface else NightSurface.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (ach.isUnlocked) NightSecondary.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.05f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Navy2Color.copy(alpha = if (ach.isUnlocked) 0.6f else 0.3f))
+                            .border(
+                                BorderStroke(
+                                    width = 1.dp,
+                                    color = if (ach.isUnlocked) GoldColor.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.05f)
+                                ),
+                                RoundedCornerShape(18.dp)
+                            )
                     ) {
                         Row(
                             modifier = Modifier.padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Badge Icon
+                            // Badge Icon on Left
                             Box(
                                 modifier = Modifier
-                                    .size(46.dp)
-                                    .clip(CircleShape)
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(14.dp))
                                     .background(
-                                        if (ach.isUnlocked) NightTertiary.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f)
+                                        if (ach.isUnlocked) {
+                                            Brush.radialGradient(
+                                                colors = listOf(GoldColor, Color(0xFFC48A10))
+                                            )
+                                        } else {
+                                            Brush.verticalGradient(
+                                                colors = listOf(Navy2Color, VoidColor)
+                                            )
+                                        }
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = if (ach.isUnlocked) Icons.Default.MilitaryTech else Icons.Default.Lock,
                                     contentDescription = null,
-                                    tint = if (ach.isUnlocked) NightTertiary else Color.Gray,
-                                    modifier = Modifier.size(26.dp)
+                                    tint = if (ach.isUnlocked) VoidColor else DimColor,
+                                    modifier = Modifier.size(28.dp)
                                 )
                             }
 
@@ -732,26 +871,61 @@ fun AchievementsScreen(
                                 Text(
                                     text = ach.title,
                                     style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (ach.isUnlocked) NightOnSurface else Color.Gray
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = if (ach.isUnlocked) MoonColor else DimColor
                                     )
                                 )
                                 Text(
                                     text = ach.description,
                                     style = MaterialTheme.typography.bodySmall.copy(
-                                        color = if (ach.isUnlocked) NightOnSurface.copy(alpha = 0.8f) else Color.Gray.copy(alpha = 0.7f)
+                                        color = if (ach.isUnlocked) DimColor else DimColor.copy(alpha = 0.6f)
                                     )
                                 )
                                 if (ach.isUnlocked && dateStr.isNotEmpty()) {
                                     Text(
                                         text = "Unlocked on $dateStr",
                                         style = MaterialTheme.typography.labelSmall.copy(
-                                            color = NightSecondary.copy(alpha = 0.7f),
+                                            color = CyanColor.copy(alpha = 0.7f),
                                             fontSize = 9.sp
                                         ),
                                         modifier = Modifier.padding(top = 4.dp)
                                     )
                                 }
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Claimed / Reward Indicator
+                            Column(
+                                horizontalAlignment = Alignment.End,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(GoldColor)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (ach.id == "golden_wings") "+5" else "+50",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Black,
+                                            color = if (ach.isUnlocked) GoldColor else DimColor
+                                        )
+                                    )
+                                }
+                                Text(
+                                    text = if (ach.isUnlocked) "Claimed" else "Locked",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = if (ach.isUnlocked) CyanColor else DimColor.copy(alpha = 0.5f),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
                             }
                         }
                     }
@@ -772,10 +946,17 @@ fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var sfxVolume by remember { mutableStateOf(0.7f) }
+    var musicVolume by remember { mutableStateOf(0.45f) }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(NightBackground)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(VoidColor, NightColor)
+                )
+            )
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
@@ -793,36 +974,51 @@ fun SettingsScreen(
                     onClick = onBack,
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(NightSurface)
+                        .background(Navy2Color.copy(alpha = 0.6f))
+                        .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.3f)), CircleShape)
+                        .size(40.dp)
                         .testTag("back_button")
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = NightSecondary
+                        tint = MoonColor
                     )
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Text(
-                    text = "SETTINGS",
+                    text = "Settings",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Black,
-                        color = NightOnBackground
+                        color = MoonColor,
+                        letterSpacing = 1.sp
                     )
                 )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Settings toggles in clean M3 styling
-            Card(
-                colors = CardDefaults.cardColors(containerColor = NightSurface),
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large
+            // AUDIO CONTROLS GROUP
+            Text(
+                text = "AUDIO",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = AmethystColor,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                ),
+                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Navy2Color.copy(alpha = 0.6f))
+                    .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.15f)), RoundedCornerShape(20.dp))
             ) {
-                Column(modifier = Modifier.padding(8.dp)) {
+                Column {
                     // Sound effects toggle
                     Row(
                         modifier = Modifier
@@ -833,23 +1029,38 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (isSoundEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                                contentDescription = null,
-                                tint = NightSecondary
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(PurpleColor, VoidColor)
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isSoundEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                    contentDescription = null,
+                                    tint = AmethystColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
                             Column {
-                                Text("Sound Effects", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = NightOnSurface))
-                                Text("Chirp and spark audio triggers", style = MaterialTheme.typography.bodySmall.copy(color = NightOnSurface.copy(alpha = 0.6f)))
+                                Text("Sound Effects", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = MoonColor))
+                                Text("Coin chimes & flap sounds", style = MaterialTheme.typography.bodySmall.copy(color = DimColor))
                             }
                         }
                         Switch(
                             checked = isSoundEnabled,
                             onCheckedChange = { onToggleSound() },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = NightSecondary,
-                                checkedTrackColor = NightSecondary.copy(alpha = 0.5f)
+                                checkedThumbColor = CyanColor,
+                                checkedTrackColor = CyanColor.copy(alpha = 0.4f),
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
                             )
                         )
                     }
@@ -866,75 +1077,224 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Vibration,
-                                contentDescription = null,
-                                tint = NightPrimary
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(PurpleColor, VoidColor)
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Vibration,
+                                    contentDescription = null,
+                                    tint = AmethystColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
                             Column {
-                                Text("Haptic Vibration", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = NightOnSurface))
-                                Text("Flapping and collision feedback", style = MaterialTheme.typography.bodySmall.copy(color = NightOnSurface.copy(alpha = 0.6f)))
+                                Text("Vibration", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = MoonColor))
+                                Text("Haptic feedback on taps", style = MaterialTheme.typography.bodySmall.copy(color = DimColor))
                             }
                         }
                         Switch(
                             checked = isVibrationEnabled,
                             onCheckedChange = { onToggleVibration() },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = NightPrimary,
-                                checkedTrackColor = NightPrimary.copy(alpha = 0.5f)
+                                checkedThumbColor = MagentaColor,
+                                checkedTrackColor = MagentaColor.copy(alpha = 0.4f),
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
                             )
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Fun facts card
-            Card(
-                colors = CardDefaults.cardColors(containerColor = NightSurface.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                border = BorderStroke(1.dp, NightOnSurface.copy(alpha = 0.05f))
+            // SLIDERS/LEVELS GROUP
+            Text(
+                text = "LEVELS",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = AmethystColor,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                ),
+                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Navy2Color.copy(alpha = 0.6f))
+                    .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.15f)), RoundedCornerShape(20.dp))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "ABOUT COCO THE CROW",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = NightSecondary,
-                            letterSpacing = 1.2.sp
+                    // SFX Slider
+                    Text("SFX Volume", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MoonColor))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Slider(
+                            value = sfxVolume,
+                            onValueChange = { sfxVolume = it },
+                            colors = SliderDefaults.colors(
+                                thumbColor = CyanColor,
+                                activeTrackColor = CyanColor,
+                                inactiveTrackColor = VoidColor
+                            ),
+                            modifier = Modifier.weight(1f)
                         )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Coco is a mischievous but friendly bird with rare blue-purple feather highlights and a sharp golden beak. He loves flying through the moonlit city at night, collecting gleaming artifacts while steering clear of chimneys and sparking power lines!",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = NightOnSurface.copy(alpha = 0.8f),
-                            lineHeight = 20.sp
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "${(sfxVolume * 100).toInt()}",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MoonColor),
+                            modifier = Modifier.width(28.dp),
+                            textAlign = TextAlign.End
                         )
-                    )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Music Slider
+                    Text("Music Volume", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MoonColor))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Slider(
+                            value = musicVolume,
+                            onValueChange = { musicVolume = it },
+                            colors = SliderDefaults.colors(
+                                thumbColor = MagentaColor,
+                                activeTrackColor = MagentaColor,
+                                inactiveTrackColor = VoidColor
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "${(musicVolume * 100).toInt()}",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MoonColor),
+                            modifier = Modifier.width(28.dp),
+                            textAlign = TextAlign.End
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // GENERAL GROUP
+            Text(
+                text = "GENERAL",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = AmethystColor,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                ),
+                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Navy2Color.copy(alpha = 0.6f))
+                    .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.15f)), RoundedCornerShape(20.dp))
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Language, contentDescription = null, tint = DimColor)
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text("Language", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = MoonColor))
+                                Text("English", style = MaterialTheme.typography.bodySmall.copy(color = DimColor))
+                            }
+                        }
+                        Icon(Icons.Default.NavigateNext, contentDescription = null, tint = AmethystColor)
+                    }
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Mail, contentDescription = null, tint = DimColor)
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text("Contact Support", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = MoonColor))
+                                Text("We answer within a moonrise", style = MaterialTheme.typography.bodySmall.copy(color = DimColor))
+                            }
+                        }
+                        Icon(Icons.Default.NavigateNext, contentDescription = null, tint = AmethystColor)
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            Text(
-                text = "FlappyCrow v1.0.0 • AI Studio Build",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    color = NightOnSurface.copy(alpha = 0.4f)
-                ),
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
+            // Footer
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(VoidColor.copy(alpha = 0.5f))
+                        .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.3f)), RoundedCornerShape(22.dp))
+                        .clickable { /* mock restore */ },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Restore Purchases",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MoonColor
+                        )
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "FlappyCrow v1.4.2 · Coco says hi 🌙",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = DimColor.copy(alpha = 0.6f),
+                        letterSpacing = 1.sp
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
         }
     }
 }
 
 
-// --- SCREEN 5: GAME OVER SCOREBOARD HUB ---
+// --- SCREEN 5: GAME OVER SCOREBOARD ---
 @Composable
 fun GameOverScreen(
     score: Int,
@@ -945,7 +1305,6 @@ fun GameOverScreen(
     onMainMenu: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Elegant pulsing animation for high score alert
     val infiniteTransition = rememberInfiniteTransition(label = "highscore_pulse")
     val alertScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -960,7 +1319,11 @@ fun GameOverScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF070414))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF240A3F), Color(0xFF0A0620))
+                )
+            )
             .statusBarsPadding()
             .navigationBarsPadding(),
         contentAlignment = Alignment.Center
@@ -968,190 +1331,259 @@ fun GameOverScreen(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .fillMaxWidth(0.85f)
+                .fillMaxWidth(0.9f)
                 .padding(24.dp)
         ) {
-            // "Game Over" title
-            Text(
-                text = "GAME OVER",
-                style = MaterialTheme.typography.displayMedium.copy(
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFFFF3366),
-                    letterSpacing = 4.sp,
-                    textAlign = TextAlign.Center
-                )
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Coco flew too close to the chimneys!",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = NightOnSurface.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
-                )
-            )
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // High Score alert
+            // High Score alert badge
             if (isNewHighScore) {
                 Surface(
-                    color = NightTertiary.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, NightTertiary),
+                    color = GoldColor,
+                    shape = RoundedCornerShape(100),
                     modifier = Modifier
                         .scale(alertScale)
-                        .padding(bottom = 20.dp)
+                        .padding(bottom = 12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = NightTertiary)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "NEW PERSONAL RECORD!",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.Black,
-                                color = NightTertiary
-                            )
-                        )
-                    }
+                    Text(
+                        text = "★ NEW BEST!",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Black,
+                            color = VoidColor,
+                            letterSpacing = 1.5.sp
+                        ),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
                 }
             }
 
-            // Results Details Box
-            Card(
-                colors = CardDefaults.cardColors(containerColor = NightSurface),
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            Text(
+                text = "Oh Feathers",
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MagentaColor,
+                    letterSpacing = 4.sp
+                )
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "GAME OVER",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontWeight = FontWeight.Black,
+                    color = MoonColor,
+                    textAlign = TextAlign.Center
+                )
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Sad math-drawn Coco with tear on canvas
+            Box(
+                modifier = Modifier
+                    .size(110.dp)
+                    .padding(bottom = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val r = 26f * density
+
+                    // Body
+                    drawCircle(color = FeatherBlack, radius = r, center = Offset(cx, cy))
+                    drawCircle(color = PurpleColor.copy(alpha = 0.5f), radius = r * 0.9f, center = Offset(cx, cy), style = Stroke(2f * density))
+
+                    // Beak facing down
+                    val beak = Path().apply {
+                        moveTo(cx + r * 0.7f, cy)
+                        lineTo(cx + r * 1.3f, cy + r * 0.4f)
+                        lineTo(cx + r * 0.7f, cy + r * 0.3f)
+                        close()
+                    }
+                    drawPath(beak, color = GoldColor)
+
+                    // Sad Closed Eyes (sleeping curved lines)
+                    val eyeX = cx + r * 0.35f
+                    val eyeY = cy - r * 0.2f
+                    val eyeW = r * 0.4f
+                    val eyePath = Path().apply {
+                        moveTo(eyeX - eyeW / 2f, eyeY)
+                        quadraticTo(eyeX, eyeY + eyeW / 2f, eyeX + eyeW / 2f, eyeY)
+                    }
+                    drawPath(eyePath, color = Color.White, style = Stroke(width = 2.5f * density))
+
+                    // Crying tear rolling down
+                    drawCircle(
+                        color = CyanColor,
+                        radius = 3.5f * density,
+                        center = Offset(eyeX + 4f * density, eyeY + 12f * density)
+                    )
+                }
+            }
+
+            // Results Details Box (Overhauled to look premium)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Navy2Color.copy(alpha = 0.8f))
+                    .border(BorderStroke(1.5.dp, MagentaColor.copy(alpha = 0.4f)), RoundedCornerShape(24.dp))
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     // Final Score
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "SCORE",
-                            style = MaterialTheme.typography.bodyLarge.copy(
+                            text = "FINAL SCORE",
+                            style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = NightOnSurface.copy(alpha = 0.7f)
+                                color = AmethystColor,
+                                letterSpacing = 2.sp
                             )
                         )
                         Text(
                             text = "$score",
-                            style = MaterialTheme.typography.titleLarge.copy(
+                            style = MaterialTheme.typography.displayLarge.copy(
                                 fontWeight = FontWeight.Black,
-                                color = NightSecondary
+                                color = MoonColor
                             )
                         )
                     }
 
                     HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
 
-                    // Coins collected
                     Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "COINS ACQUIRED",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = NightOnSurface.copy(alpha = 0.7f)
-                            )
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(12.dp)
-                                    .clip(CircleShape)
-                                    .background(NightTertiary)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "+$coinsCollected",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = NightTertiary
-                                )
-                            )
+                        // Personal Best
+                        Column(horizontalAlignment = Alignment.Start) {
+                            Text("BEST", style = MaterialTheme.typography.labelSmall.copy(color = DimColor, fontWeight = FontWeight.Bold))
+                            Text("$highScore", style = MaterialTheme.typography.titleMedium.copy(color = MoonColor, fontWeight = FontWeight.ExtraBold))
                         }
-                    }
 
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+                        // Coins acquired
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("COINS", style = MaterialTheme.typography.labelSmall.copy(color = DimColor, fontWeight = FontWeight.Bold))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(GoldColor))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("+$coinsCollected", style = MaterialTheme.typography.titleMedium.copy(color = GoldColor, fontWeight = FontWeight.ExtraBold))
+                            }
+                        }
 
-                    // Best Score
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "PERSONAL BEST",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = NightOnSurface.copy(alpha = 0.7f)
-                            )
-                        )
-                        Text(
-                            text = "$highScore",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = NightOnSurface
-                            )
-                        )
+                        // Gems acquired (relative gems)
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("GEMS", style = MaterialTheme.typography.labelSmall.copy(color = DimColor, fontWeight = FontWeight.Bold))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(AmethystColor)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("+${(score / 12).coerceAtLeast(0)}", style = MaterialTheme.typography.titleMedium.copy(color = AmethystColor, fontWeight = FontWeight.ExtraBold))
+                            }
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Action Buttons
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Button(
-                    onClick = onTryAgain,
-                    colors = ButtonDefaults.buttonColors(containerColor = NightPrimary),
-                    shape = RoundedCornerShape(25.dp),
+                // Retry button (Magenta)
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("try_again_button")
+                        .height(54.dp)
+                        .clip(RoundedCornerShape(27.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(MagentaColor, PurpleColor)
+                            )
+                        )
+                        .clickable { onTryAgain() }
+                        .testTag("try_again_button"),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "TRY AGAIN",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = NightBackground
+                        text = "RETRY FLIGHT",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MoonColor,
+                            letterSpacing = 1.5.sp
                         )
                     )
                 }
 
-                Button(
-                    onClick = onMainMenu,
-                    colors = ButtonDefaults.buttonColors(containerColor = NightSurface),
-                    shape = RoundedCornerShape(25.dp),
-                    border = BorderStroke(1.dp, NightOnSurface.copy(alpha = 0.2f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("main_menu_button")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "MAIN MENU",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = NightOnSurface
-                        )
-                    )
+                    // Home button
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp)
+                            .clip(RoundedCornerShape(25.dp))
+                            .background(Navy2Color.copy(alpha = 0.7f))
+                            .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.3f)), RoundedCornerShape(25.dp))
+                            .clickable { onMainMenu() }
+                            .testTag("main_menu_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Home, contentDescription = null, tint = MoonColor, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Home",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MoonColor
+                                )
+                            )
+                        }
+                    }
+
+                    // Share button
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp)
+                            .clip(RoundedCornerShape(25.dp))
+                            .background(Navy2Color.copy(alpha = 0.7f))
+                            .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.3f)), RoundedCornerShape(25.dp))
+                            .clickable { /* share mock */ },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, tint = MoonColor, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Share",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MoonColor
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1188,11 +1620,11 @@ fun PreviewCrow(accessoryId: String, modifier: Modifier = Modifier) {
             close()
         }
         drawPath(tail, color = FeatherBlack)
-        drawPath(tail, color = FeatherHighlight.copy(alpha = 0.3f), style = Stroke(width = 2f * density))
+        drawPath(tail, color = PurpleColor.copy(alpha = 0.3f), style = Stroke(width = 2f * density))
 
         // Draw body
         drawCircle(color = FeatherBlack, radius = r, center = Offset(cx, cy))
-        drawCircle(color = FeatherHighlight, radius = r * 0.9f, center = Offset(cx, cy), style = Stroke(width = 2.5f * density))
+        drawCircle(color = PurpleColor, radius = r * 0.9f, center = Offset(cx, cy), style = Stroke(width = 2.5f * density))
 
         // Draw beak
         val beak = Path().apply {
@@ -1201,23 +1633,16 @@ fun PreviewCrow(accessoryId: String, modifier: Modifier = Modifier) {
             lineTo(cx + r * 0.8f, cy + r * 0.25f)
             close()
         }
-        drawPath(beak, color = NightBeakGold)
+        drawPath(beak, color = GoldColor)
 
         // Eye
         drawCircle(color = Color.White, radius = r * 0.32f, center = Offset(cx + r * 0.35f, cy - r * 0.32f))
         drawCircle(color = Color.Black, radius = r * 0.16f, center = Offset(cx + r * 0.4f, cy - r * 0.32f))
-        drawCircle(color = Color.White, radius = r * 0.05f, center = Offset(cx + r * 0.45f, cy - r * 0.36f))
+        drawCircle(color = CyanColor, radius = r * 0.05f, center = Offset(cx + r * 0.45f, cy - r * 0.36f))
 
-        // Wing
+        // Wing shadow / background
         val wingPivotX = cx - r * 0.1f
         val wingPivotY = cy + r * 0.1f
-        val wingW = r * 1.1f
-        val wingH = r * 0.6f
-
-        // Let's do simple rotate mapping for previews
-        val wingRotAngle = wingAngle
-        
-        // Draw wing shadow / background
         drawCircle(color = FeatherBlack, radius = r * 0.55f, center = Offset(wingPivotX, wingPivotY))
 
         // Draw accessory on preview
@@ -1227,7 +1652,6 @@ fun PreviewCrow(accessoryId: String, modifier: Modifier = Modifier) {
 
 // Draw accessory preview onto prebuilt avatar
 private fun DrawScope.drawAccessoryPreview(id: String, cx: Float, cy: Float, r: Float, density: Float) {
-    // Reuses the identical drawing logic from FlappyCrowGame to keep preview fully integrated!
     val scaleX = density
     val scaleY = density
 
@@ -1270,7 +1694,6 @@ private fun DrawScope.drawAccessoryPreview(id: String, cx: Float, cy: Float, r: 
                 cornerRadius = CornerRadius(3f * scaleX)
             )
 
-            // Preview tail waving softly
             val tailPath = Path().apply {
                 moveTo(neckX - 2f * scaleX, neckY + 2f * scaleY)
                 quadraticTo(
@@ -1314,7 +1737,7 @@ private fun DrawScope.drawAccessoryPreview(id: String, cx: Float, cy: Float, r: 
         }
 
         "golden_crown" -> {
-            val crownGold = NightBeakGold
+            val crownGold = GoldColor
             val hatTop = cy - r * 0.9f
 
             val crownPath = Path().apply {
@@ -1354,7 +1777,7 @@ private fun DrawScope.drawAccessoryPreview(id: String, cx: Float, cy: Float, r: 
                 style = Stroke(width = 3f * scaleX)
             )
             drawCircle(
-                color = NightSecondary.copy(alpha = 0.5f),
+                color = CyanColor.copy(alpha = 0.5f),
                 radius = eyeRadius * 0.7f,
                 center = Offset(eyeX, eyeY)
             )
@@ -1370,21 +1793,19 @@ fun PreviewAccessoryIcon(id: String, modifier: Modifier = Modifier) {
         val cy = size.height / 2f
         val r = size.width * 0.32f
 
-        // Draw a clean stand/pedestal
+        // Draw a clean pedestal
         drawRoundRect(
-            color = Color(0xFF2C254C),
+            color = VoidColor,
             topLeft = Offset(cx - r, cy + r * 0.4f),
             size = Size(r * 2f, 8f * density),
             cornerRadius = CornerRadius(4f * density)
         )
 
-        // Draw the specific accessory on the pedestal
         val scaleX = density
         val scaleY = density
 
         when (id) {
             "none" -> {
-                // Cross mark indicating empty wardrobe slot
                 drawLine(
                     color = Color.Gray,
                     start = Offset(cx - r * 0.5f, cy - r * 0.5f),
@@ -1480,7 +1901,7 @@ fun PreviewAccessoryIcon(id: String, modifier: Modifier = Modifier) {
             }
 
             "golden_crown" -> {
-                val crownGold = NightBeakGold
+                val crownGold = GoldColor
                 val hatTop = cy + r * 0.2f
 
                 val crownPath = Path().apply {
@@ -1513,30 +1934,26 @@ fun PreviewAccessoryIcon(id: String, modifier: Modifier = Modifier) {
                     strokeWidth = 4f * scaleY
                 )
 
-                // Left Rim
                 drawCircle(
                     color = goggleBrown,
                     radius = eyeRadius,
                     center = Offset(eyeX - eyeRadius * 1.1f, eyeY),
                     style = Stroke(width = 3.5f * scaleX)
                 )
-                // Left lens
                 drawCircle(
-                    color = NightSecondary.copy(alpha = 0.5f),
+                    color = CyanColor.copy(alpha = 0.5f),
                     radius = eyeRadius * 0.75f,
                     center = Offset(eyeX - eyeRadius * 1.1f, eyeY)
                 )
 
-                // Right Rim
                 drawCircle(
                     color = goggleBrown,
                     radius = eyeRadius,
                     center = Offset(eyeX + eyeRadius * 1.1f, eyeY),
                     style = Stroke(width = 3.5f * scaleX)
                 )
-                // Right lens
                 drawCircle(
-                    color = NightSecondary.copy(alpha = 0.5f),
+                    color = CyanColor.copy(alpha = 0.5f),
                     radius = eyeRadius * 0.75f,
                     center = Offset(eyeX + eyeRadius * 1.1f, eyeY)
                 )

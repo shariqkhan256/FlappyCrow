@@ -67,6 +67,7 @@ fun GameNavigationOrchestrator(viewModel: GameViewModel) {
             GameScreen.Game -> {
                 FlappyCrowGame(
                     selectedAccessory = stats.selectedAccessory,
+                    highScore = stats.highScore,
                     isSoundEnabled = viewModel.isSoundEnabled,
                     isVibrationEnabled = viewModel.isVibrationEnabled,
                     onGameOver = { score, coins ->

@@ -1,4 +1,4 @@
-# 🐦 FlappyCrow.
+# 🐦 FlappyCrow
 
 **FlappyCrow** is a high-fidelity, fully native Android casual arcade game built from the ground up using **Kotlin**, **Jetpack Compose**, and **Material Design 3**. Guide Coco the mischievous crow through a magical moonlit city, dodging tricky chimney pipes, collecting sparkling coins and gems, and unlocking cool accessories along the way!
 
