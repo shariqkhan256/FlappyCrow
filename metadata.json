@@ -1,0 +1,6 @@
+{
+  "name": "FlappyCrow",
+  "description": "Guide Coco the mischievous crow through a magical moonlit city in this polished casual game.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
