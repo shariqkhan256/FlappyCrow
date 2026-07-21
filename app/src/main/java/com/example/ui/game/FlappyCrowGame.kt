@@ -254,6 +254,7 @@ fun FlappyCrowGame(
             }
             playerVelocity = flapStrength
             triggerVibration(15)
+            RetroAudioEngine.playFlap(isSoundEnabled)
 
             // Spawn cute feather particles trailing behind
             for (i in 0..3) {
@@ -298,6 +299,7 @@ fun FlappyCrowGame(
                     collisionFlash = true
                     shakeDuration = 15
                     triggerVibration(120)
+                    RetroAudioEngine.playHit(isSoundEnabled)
                     delay(300)
                     onGameOver(score, coinsCollected)
                     break
@@ -387,6 +389,7 @@ fun FlappyCrowGame(
                         obs.passed = true
                         score++
                         triggerVibration(25)
+                        RetroAudioEngine.playCoin(isSoundEnabled)
                         
                         // Particle celebration burst when score increases
                         for (i in 1..6) {
@@ -432,6 +435,7 @@ fun FlappyCrowGame(
                         }
                         coinsCollected += value
                         triggerVibration(30)
+                        RetroAudioEngine.playCoin(isSoundEnabled)
 
                         // Gold/Orange sparkles on collect
                         val sparkColor = when(col.type) {
@@ -518,6 +522,7 @@ fun FlappyCrowGame(
                     collisionFlash = true
                     shakeDuration = 18
                     triggerVibration(200)
+                    RetroAudioEngine.playHit(isSoundEnabled)
                     delay(350)
                     onGameOver(score, coinsCollected)
                     break
