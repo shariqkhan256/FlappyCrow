@@ -1436,24 +1436,55 @@ private fun DrawScope.drawPlayer(
             bodyPath,
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0xFF332657),
-                    Color(0xFF1B162E),
-                    Color(0xFF0E0B19)
+                    Color(0xFF3B2A63),
+                    Color(0xFF1F1836),
+                    Color(0xFF0F0B1A)
                 ),
                 center = Offset(px + r * 0.2f, py - r * 0.2f),
-                radius = r * 1.3f
+                radius = r * 1.35f
             )
         )
 
-        // Glowing outer body stroke rim (Cyan/Amethyst sheen)
+        // Scruffy Feather Crest Tufts on top/back of head (Signifying her playful, chaotic character)
+        val headTufts = Path().apply {
+            // Top crest tuft 1
+            moveTo(px - r * 0.1f, py - r * 0.92f)
+            quadraticTo(px - r * 0.25f, py - r * 1.35f, px - r * 0.02f, py - r * 1.05f)
+            // Top crest tuft 2
+            quadraticTo(px - r * 0.45f, py - r * 1.25f, px - r * 0.25f, py - r * 0.85f)
+            // Back scruffy tuft 3
+            quadraticTo(px - r * 0.75f, py - r * 1.05f, px - r * 0.55f, py - r * 0.65f)
+            close()
+        }
+        drawPath(
+            headTufts,
+            brush = Brush.verticalGradient(
+                colors = listOf(Color(0xFF4A3875), Color(0xFF1A132C)),
+                startY = py - r * 1.35f,
+                endY = py - r * 0.65f
+            )
+        )
+        drawPath(headTufts, color = CyanColor.copy(alpha = 0.6f), style = Stroke(width = 1.6f * scaleX))
+
+        // Cute Scruffy Cheek Feather Fluff
+        val cheekFluff = Path().apply {
+            moveTo(px - r * 0.15f, py + r * 0.15f)
+            quadraticTo(px - r * 0.55f, py + r * 0.25f, px - r * 0.25f, py + r * 0.45f)
+            quadraticTo(px - r * 0.6f, py + r * 0.55f, px - r * 0.15f, py + r * 0.65f)
+            close()
+        }
+        drawPath(cheekFluff, color = Color(0xFF231A3D))
+        drawPath(cheekFluff, color = AmethystColor.copy(alpha = 0.5f), style = Stroke(width = 1.4f * scaleX))
+
+        // Glowing outer body stroke rim (Moonlit Silver/Cyan sheen)
         drawPath(
             bodyPath,
             brush = Brush.sweepGradient(
                 colors = listOf(
-                    CyanColor.copy(alpha = 0.8f),
-                    AmethystColor.copy(alpha = 0.6f),
-                    PurpleColor.copy(alpha = 0.7f),
-                    CyanColor.copy(alpha = 0.8f)
+                    CyanColor.copy(alpha = 0.85f),
+                    Color(0xFFE2D6FF).copy(alpha = 0.7f), // Moonlit silver
+                    AmethystColor.copy(alpha = 0.65f),
+                    CyanColor.copy(alpha = 0.85f)
                 ),
                 center = Offset(px, py)
             ),
@@ -1468,40 +1499,54 @@ private fun DrawScope.drawPlayer(
         }
         drawPath(chestFluff, color = AmethystColor.copy(alpha = 0.5f), style = Stroke(width = 2f * scaleX))
 
-        // 4. 3D Sculpted Golden Beak
+        // 4. 3D Sculpted Golden Beak with Dynamic Flap/Upward Open Reaction
+        val isBeakOpen = (playerAngle < -5f) || (gameTicks % 30 < 6)
+        val beakOpenGap = if (isBeakOpen) r * 0.12f else 0f
+
         val upperBeak = Path().apply {
             moveTo(px + r * 0.75f, py - r * 0.25f)
             quadraticTo(
-                px + r * 1.3f, py - r * 0.28f,
-                px + r * 1.8f, py + r * 0.05f // Sharp cute beak tip
+                px + r * 1.35f, py - r * 0.28f,
+                px + r * 1.85f, py - beakOpenGap * 0.5f // Curved upper beak tip
             )
-            lineTo(px + r * 0.78f, py + r * 0.05f)
+            lineTo(px + r * 0.78f, py - beakOpenGap * 0.2f)
             close()
         }
         val lowerBeak = Path().apply {
-            moveTo(px + r * 0.78f, py + r * 0.05f)
-            lineTo(px + r * 1.8f, py + r * 0.05f)
+            moveTo(px + r * 0.78f, py + r * 0.05f + beakOpenGap * 0.3f)
+            lineTo(px + r * 1.85f, py + beakOpenGap * 0.5f)
             quadraticTo(
-                px + r * 1.25f, py + r * 0.35f,
-                px + r * 0.75f, py + r * 0.28f
+                px + r * 1.25f, py + r * 0.38f + beakOpenGap,
+                px + r * 0.75f, py + r * 0.28f + beakOpenGap
             )
             close()
         }
 
         // Fill beak with 3D gold gradient
         val beakGradient = Brush.verticalGradient(
-            colors = listOf(Color(0xFFFFF176), Color(0xFFFFB300), Color(0xFFE65100)),
+            colors = listOf(Color(0xFFFFF59D), Color(0xFFFFB300), Color(0xFFE65100)),
             startY = py - r * 0.3f,
             endY = py + r * 0.3f
         )
         drawPath(upperBeak, brush = beakGradient)
         drawPath(lowerBeak, brush = beakGradient)
 
+        // Dark interior mouth gap when beak is open
+        if (isBeakOpen) {
+            val mouthGap = Path().apply {
+                moveTo(px + r * 0.8f, py - beakOpenGap * 0.1f)
+                lineTo(px + r * 1.7f, py)
+                lineTo(px + r * 0.8f, py + beakOpenGap * 0.4f)
+                close()
+            }
+            drawPath(mouthGap, color = Color(0xFF3E1F00))
+        }
+
         // Beak ridge white highlight
         drawLine(
-            color = Color.White.copy(alpha = 0.85f),
+            color = Color.White.copy(alpha = 0.9f),
             start = Offset(px + r * 0.85f, py - r * 0.22f),
-            end = Offset(px + r * 1.55f, py - r * 0.02f),
+            end = Offset(px + r * 1.6f, py - beakOpenGap * 0.4f),
             strokeWidth = 1.8f * scaleX,
             cap = StrokeCap.Round
         )
@@ -1513,7 +1558,7 @@ private fun DrawScope.drawPlayer(
             center = Offset(px + r * 0.95f, py - r * 0.16f)
         )
 
-        // 5. Expressive High-Quality Anime Eyes
+        // 5. Expressive High-Quality Anime Eyes (Glowing Amber Gold Iris)
         val eyeX = px + r * 0.42f
         val eyeY = py - r * 0.32f
         val eyeRadius = r * 0.38f
@@ -1527,48 +1572,64 @@ private fun DrawScope.drawPlayer(
             }
             drawPath(blinkPath, color = NightOnBackground, style = Stroke(width = 3f * scaleX, cap = StrokeCap.Round))
         } else {
-            // White eyeball background with soft drop shadow
+            // White eyeball background
             drawCircle(
                 color = Color.White,
                 radius = eyeRadius,
                 center = Offset(eyeX, eyeY)
             )
 
-            // Iris with rich midnight violet gradient
+            // Luminous Golden-Amber Iris (Warmth, high contrast & expressive charm)
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF0D0B18), Color(0xFF281E45), Color(0xFF120E21)),
-                    center = Offset(eyeX + eyeRadius * 0.1f, eyeY),
-                    radius = eyeRadius * 0.7f
+                    colors = listOf(Color(0xFFFFF176), Color(0xFFFFB300), Color(0xFFE65100), Color(0xFF4E1D00)),
+                    center = Offset(eyeX + eyeRadius * 0.1f, eyeY - eyeRadius * 0.05f),
+                    radius = eyeRadius * 0.72f
                 ),
-                radius = eyeRadius * 0.7f,
+                radius = eyeRadius * 0.72f,
                 center = Offset(eyeX + eyeRadius * 0.15f, eyeY)
             )
 
-            // Iris bottom cyan glow curve (Anime eye style)
-            val irisGlowPath = Path().apply {
-                moveTo(eyeX - eyeRadius * 0.2f, eyeY + eyeRadius * 0.3f)
-                quadraticTo(
-                    eyeX + eyeRadius * 0.2f, eyeY + eyeRadius * 0.6f,
-                    eyeX + eyeRadius * 0.5f, eyeY + eyeRadius * 0.2f
-                )
-            }
-            drawPath(irisGlowPath, color = CyanColor.copy(alpha = 0.85f), style = Stroke(width = 2f * scaleX, cap = StrokeCap.Round))
+            // Black pupil
+            drawCircle(
+                color = Color(0xFF100A03),
+                radius = eyeRadius * 0.42f,
+                center = Offset(eyeX + eyeRadius * 0.18f, eyeY)
+            )
 
             // Primary Sparkle Catchlight (Large top-right reflection)
             drawCircle(
                 color = Color.White,
-                radius = eyeRadius * 0.25f,
+                radius = eyeRadius * 0.26f,
                 center = Offset(eyeX + eyeRadius * 0.32f, eyeY - eyeRadius * 0.25f)
             )
 
-            // Secondary Catchlight (Small bottom-left reflection)
+            // Secondary Catchlight (Small bottom-left sparkle reflection)
             drawCircle(
-                color = Color.White.copy(alpha = 0.8f),
-                radius = eyeRadius * 0.12f,
-                center = Offset(eyeX - eyeRadius * 0.1f, eyeY + eyeRadius * 0.25f)
+                color = Color.White.copy(alpha = 0.85f),
+                radius = eyeRadius * 0.13f,
+                center = Offset(eyeX - eyeRadius * 0.08f, eyeY + eyeRadius * 0.25f)
             )
         }
+
+        // Cheeky Eyebrow / Brow Feather Ridge (Gives Coco her iconic mischievous, clever personality)
+        val browRidge = Path().apply {
+            moveTo(eyeX - eyeRadius * 0.9f, eyeY - eyeRadius * 0.85f)
+            quadraticTo(
+                eyeX, eyeY - eyeRadius * 1.25f,
+                eyeX + eyeRadius * 1.05f, eyeY - eyeRadius * 0.6f
+            )
+        }
+        drawPath(
+            browRidge,
+            color = Color(0xFF160F2B),
+            style = Stroke(width = 3.5f * scaleX, cap = StrokeCap.Round)
+        )
+        drawPath(
+            browRidge,
+            color = CyanColor.copy(alpha = 0.75f),
+            style = Stroke(width = 1.5f * scaleX, cap = StrokeCap.Round)
+        )
 
         // Cute Rosy Pink Blush Cheek Mark
         drawCircle(
