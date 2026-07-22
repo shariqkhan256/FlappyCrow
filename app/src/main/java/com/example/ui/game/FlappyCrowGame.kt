@@ -1348,128 +1348,303 @@ private fun DrawScope.drawPlayer(
 
     // Rotate player based on velocity angle
     rotate(degrees = playerAngle, pivot = Offset(px, py)) {
-        
-        // 1. Tail Feathers (triangles pointing backwards/left)
-        val tailPath = Path().apply {
-            moveTo(px - r * 0.9f, py)
-            lineTo(px - r * 1.6f, py - r * 0.4f)
-            lineTo(px - r * 1.5f, py)
-            lineTo(px - r * 1.6f, py + r * 0.4f)
-            close()
-        }
-        drawPath(tailPath, color = FeatherBlack)
-        drawPath(tailPath, color = FeatherHighlight.copy(alpha = 0.3f), style = Stroke(width = 2f * scaleX))
 
-        // 2. Crow Main Body (beautiful deep black-purple)
+        // 0. Outer Magical Aura Halo
         drawCircle(
-            color = FeatherBlack,
-            radius = r,
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    CyanColor.copy(alpha = 0.25f),
+                    AmethystColor.copy(alpha = 0.15f),
+                    Color.Transparent
+                ),
+                center = Offset(px, py),
+                radius = r * 1.8f
+            ),
+            radius = r * 1.8f,
             center = Offset(px, py)
         )
-        // Cute purple highlight glow inside the body
-        drawCircle(
-            color = FeatherHighlight,
-            radius = r * 0.9f,
-            center = Offset(px, py),
-            style = Stroke(width = 3f * scaleX)
-        )
 
-        // 3. Golden Beak (cute forward triangle)
-        val beakPath = Path().apply {
-            moveTo(px + r * 0.8f, py - r * 0.3f)
-            lineTo(px + r * 1.7f, py)
-            lineTo(px + r * 0.8f, py + r * 0.3f)
+        // 1. Multi-Layered Tail Feathers Fan (Spread raven tail feathers with gradient & highlights)
+        val tailSway = sin(gameTicks * 0.12f) * 4f
+        for (i in -1..1) {
+            val spreadAngle = i * 16f + tailSway
+            rotate(degrees = spreadAngle, pivot = Offset(px - r * 0.7f, py)) {
+                val tailPath = Path().apply {
+                    moveTo(px - r * 0.7f, py)
+                    lineTo(px - r * 1.65f, py - r * 0.22f)
+                    quadraticTo(
+                        px - r * 1.85f, py,
+                        px - r * 1.65f, py + r * 0.22f
+                    )
+                    close()
+                }
+                drawPath(
+                    tailPath,
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color(0xFF141121), Color(0xFF261D42), Color(0xFF382963)),
+                        start = Offset(px - r * 0.7f, py),
+                        end = Offset(px - r * 1.8f, py)
+                    )
+                )
+                drawPath(
+                    tailPath,
+                    color = CyanColor.copy(alpha = 0.4f),
+                    style = Stroke(width = 1.5f * scaleX)
+                )
+            }
+        }
+
+        // 2. Cute Avian Feet Claws (Tucked under body)
+        val feetColor = Color(0xFFFF9800)
+        val leftFootPath = Path().apply {
+            moveTo(px - r * 0.2f, py + r * 0.85f)
+            lineTo(px - r * 0.35f, py + r * 1.15f)
+            lineTo(px - r * 0.15f, py + r * 1.12f)
+            lineTo(px - r * 0.05f, py + r * 1.15f)
             close()
         }
-        drawPath(beakPath, color = NightBeakGold)
+        val rightFootPath = Path().apply {
+            moveTo(px + r * 0.15f, py + r * 0.85f)
+            lineTo(px + r * 0.05f, py + r * 1.15f)
+            lineTo(px + r * 0.2f, py + r * 1.12f)
+            lineTo(px + r * 0.3f, py + r * 1.15f)
+            close()
+        }
+        drawPath(leftFootPath, color = feetColor)
+        drawPath(rightFootPath, color = feetColor)
 
-        // 4. Large Expressive Eyes (White outer, black pupil, twinkling white dot)
-        val eyeX = px + r * 0.4f
-        val eyeY = py - r * 0.3f
-        val eyeRadius = r * 0.35f
-        
-        // Eye blinking logic (blinks occasionally)
+        // 3. Crow Main Body (Organic teardrop shape + Radial Obsidian/Amethyst Gradient)
+        val bodyPath = Path().apply {
+            moveTo(px + r * 0.85f, py - r * 0.1f) // Head top
+            quadraticTo(
+                px + r * 1.05f, py + r * 0.4f,
+                px + r * 0.4f, py + r * 0.95f // Chest/belly curve
+            )
+            quadraticTo(
+                px - r * 0.6f, py + r * 1.05f,
+                px - r * 0.95f, py + r * 0.2f // Back lower curve
+            )
+            quadraticTo(
+                px - r * 0.85f, py - r * 0.85f,
+                px + r * 0.1f, py - r * 0.95f // Back upper curve
+            )
+            close()
+        }
+
+        // Draw deep body gradient fill
+        drawPath(
+            bodyPath,
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFF332657),
+                    Color(0xFF1B162E),
+                    Color(0xFF0E0B19)
+                ),
+                center = Offset(px + r * 0.2f, py - r * 0.2f),
+                radius = r * 1.3f
+            )
+        )
+
+        // Glowing outer body stroke rim (Cyan/Amethyst sheen)
+        drawPath(
+            bodyPath,
+            brush = Brush.sweepGradient(
+                colors = listOf(
+                    CyanColor.copy(alpha = 0.8f),
+                    AmethystColor.copy(alpha = 0.6f),
+                    PurpleColor.copy(alpha = 0.7f),
+                    CyanColor.copy(alpha = 0.8f)
+                ),
+                center = Offset(px, py)
+            ),
+            style = Stroke(width = 2.5f * scaleX)
+        )
+
+        // Cute chest feather fluff ripples
+        val chestFluff = Path().apply {
+            moveTo(px + r * 0.45f, py + r * 0.25f)
+            quadraticTo(px + r * 0.25f, py + r * 0.45f, px + r * 0.5f, py + r * 0.6f)
+            quadraticTo(px + r * 0.25f, py + r * 0.75f, px + r * 0.35f, py + r * 0.85f)
+        }
+        drawPath(chestFluff, color = AmethystColor.copy(alpha = 0.5f), style = Stroke(width = 2f * scaleX))
+
+        // 4. 3D Sculpted Golden Beak
+        val upperBeak = Path().apply {
+            moveTo(px + r * 0.75f, py - r * 0.25f)
+            quadraticTo(
+                px + r * 1.3f, py - r * 0.28f,
+                px + r * 1.8f, py + r * 0.05f // Sharp cute beak tip
+            )
+            lineTo(px + r * 0.78f, py + r * 0.05f)
+            close()
+        }
+        val lowerBeak = Path().apply {
+            moveTo(px + r * 0.78f, py + r * 0.05f)
+            lineTo(px + r * 1.8f, py + r * 0.05f)
+            quadraticTo(
+                px + r * 1.25f, py + r * 0.35f,
+                px + r * 0.75f, py + r * 0.28f
+            )
+            close()
+        }
+
+        // Fill beak with 3D gold gradient
+        val beakGradient = Brush.verticalGradient(
+            colors = listOf(Color(0xFFFFF176), Color(0xFFFFB300), Color(0xFFE65100)),
+            startY = py - r * 0.3f,
+            endY = py + r * 0.3f
+        )
+        drawPath(upperBeak, brush = beakGradient)
+        drawPath(lowerBeak, brush = beakGradient)
+
+        // Beak ridge white highlight
+        drawLine(
+            color = Color.White.copy(alpha = 0.85f),
+            start = Offset(px + r * 0.85f, py - r * 0.22f),
+            end = Offset(px + r * 1.55f, py - r * 0.02f),
+            strokeWidth = 1.8f * scaleX,
+            cap = StrokeCap.Round
+        )
+
+        // Tiny cute nostril slot
+        drawCircle(
+            color = Color(0xFF422100),
+            radius = r * 0.05f,
+            center = Offset(px + r * 0.95f, py - r * 0.16f)
+        )
+
+        // 5. Expressive High-Quality Anime Eyes
+        val eyeX = px + r * 0.42f
+        val eyeY = py - r * 0.32f
+        val eyeRadius = r * 0.38f
+
         val isBlinking = (gameTicks % 120 > 112)
         if (isBlinking) {
-            // Closed eye line
-            drawLine(
-                color = NightOnBackground,
-                start = Offset(eyeX - eyeRadius, eyeY),
-                end = Offset(eyeX + eyeRadius, eyeY),
-                strokeWidth = 2f * scaleX
-            )
+            // Cute fluttering closed eye arch
+            val blinkPath = Path().apply {
+                moveTo(eyeX - eyeRadius * 0.8f, eyeY)
+                quadraticTo(eyeX, eyeY + eyeRadius * 0.4f, eyeX + eyeRadius * 0.8f, eyeY)
+            }
+            drawPath(blinkPath, color = NightOnBackground, style = Stroke(width = 3f * scaleX, cap = StrokeCap.Round))
         } else {
-            // White eyeball
+            // White eyeball background with soft drop shadow
             drawCircle(
                 color = Color.White,
                 radius = eyeRadius,
                 center = Offset(eyeX, eyeY)
             )
-            // Black pupil
+
+            // Iris with rich midnight violet gradient
             drawCircle(
-                color = Color.Black,
-                radius = eyeRadius * 0.5f,
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF0D0B18), Color(0xFF281E45), Color(0xFF120E21)),
+                    center = Offset(eyeX + eyeRadius * 0.1f, eyeY),
+                    radius = eyeRadius * 0.7f
+                ),
+                radius = eyeRadius * 0.7f,
                 center = Offset(eyeX + eyeRadius * 0.15f, eyeY)
             )
-            // Tiny highlight shine
+
+            // Iris bottom cyan glow curve (Anime eye style)
+            val irisGlowPath = Path().apply {
+                moveTo(eyeX - eyeRadius * 0.2f, eyeY + eyeRadius * 0.3f)
+                quadraticTo(
+                    eyeX + eyeRadius * 0.2f, eyeY + eyeRadius * 0.6f,
+                    eyeX + eyeRadius * 0.5f, eyeY + eyeRadius * 0.2f
+                )
+            }
+            drawPath(irisGlowPath, color = CyanColor.copy(alpha = 0.85f), style = Stroke(width = 2f * scaleX, cap = StrokeCap.Round))
+
+            // Primary Sparkle Catchlight (Large top-right reflection)
             drawCircle(
                 color = Color.White,
-                radius = eyeRadius * 0.15f,
-                center = Offset(eyeX + eyeRadius * 0.3f, eyeY - eyeRadius * 0.2f)
+                radius = eyeRadius * 0.25f,
+                center = Offset(eyeX + eyeRadius * 0.32f, eyeY - eyeRadius * 0.25f)
+            )
+
+            // Secondary Catchlight (Small bottom-left reflection)
+            drawCircle(
+                color = Color.White.copy(alpha = 0.8f),
+                radius = eyeRadius * 0.12f,
+                center = Offset(eyeX - eyeRadius * 0.1f, eyeY + eyeRadius * 0.25f)
             )
         }
 
-        // 5. Wings (multi-feather keyframe sprite-like flapping)
-        val wingWidth = r * 1.3f
-        val wingHeight = r * 0.75f
+        // Cute Rosy Pink Blush Cheek Mark
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0xFFFF5252).copy(alpha = 0.55f), Color.Transparent),
+                center = Offset(eyeX + eyeRadius * 0.1f, eyeY + eyeRadius * 1.15f),
+                radius = r * 0.28f
+            ),
+            radius = r * 0.28f,
+            center = Offset(eyeX + eyeRadius * 0.1f, eyeY + eyeRadius * 1.15f)
+        )
+
+        // 6. Multi-Layered Feather Wings with Gradient Fills
+        val wingWidth = r * 1.35f
+        val wingHeight = r * 0.8f
         val wingPivotX = px - r * 0.1f
-        val wingPivotY = py + r * 0.1f
+        val wingPivotY = py + r * 0.12f
 
         rotate(degrees = wingAngle, pivot = Offset(wingPivotX, wingPivotY)) {
-            // Feather spread factor based on keyframe wing position (-45° = spread open, +40° = folded)
             val spread = ((wingAngle + 45f) / 85f).coerceIn(0f, 1f)
 
-            // Primary Feather 1 (Longest outer flight feather)
+            // Primary Flight Feather 1
             val feather1 = Path().apply {
                 moveTo(wingPivotX, wingPivotY)
-                lineTo(wingPivotX - wingWidth * 1.1f, wingPivotY - wingHeight * (0.85f + 0.25f * spread))
+                lineTo(wingPivotX - wingWidth * 1.15f, wingPivotY - wingHeight * (0.88f + 0.25f * spread))
                 quadraticTo(
-                    wingPivotX - wingWidth * 0.55f, wingPivotY + wingHeight * 0.4f,
+                    wingPivotX - wingWidth * 0.55f, wingPivotY + wingHeight * 0.45f,
                     wingPivotX, wingPivotY
                 )
                 close()
             }
-            drawPath(feather1, color = FeatherBlack)
-            drawPath(feather1, color = FeatherHighlight, style = Stroke(width = 1.8f * scaleX))
+            drawPath(
+                feather1,
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0xFF120E21), Color(0xFF2E2154), Color(0xFF4A3482)),
+                    start = Offset(wingPivotX, wingPivotY),
+                    end = Offset(wingPivotX - wingWidth, wingPivotY - wingHeight)
+                )
+            )
+            drawPath(feather1, color = CyanColor.copy(alpha = 0.85f), style = Stroke(width = 2f * scaleX))
 
-            // Secondary Feather 2 (Middle covert feather)
+            // Secondary Covert Feather 2
             val feather2 = Path().apply {
                 moveTo(wingPivotX, wingPivotY)
-                lineTo(wingPivotX - wingWidth * 0.9f, wingPivotY - wingHeight * (0.55f - 0.2f * spread))
+                lineTo(wingPivotX - wingWidth * 0.92f, wingPivotY - wingHeight * (0.58f - 0.2f * spread))
                 quadraticTo(
-                    wingPivotX - wingWidth * 0.45f, wingPivotY + wingHeight * 0.45f,
+                    wingPivotX - wingWidth * 0.45f, wingPivotY + wingHeight * 0.48f,
                     wingPivotX, wingPivotY
                 )
                 close()
             }
-            drawPath(feather2, color = FeatherBlack)
-            drawPath(feather2, color = AmethystColor.copy(alpha = 0.6f), style = Stroke(width = 1.4f * scaleX))
+            drawPath(
+                feather2,
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0xFF1C1733), Color(0xFF382766)),
+                    start = Offset(wingPivotX, wingPivotY),
+                    end = Offset(wingPivotX - wingWidth * 0.8f, wingPivotY - wingHeight * 0.5f)
+                )
+            )
+            drawPath(feather2, color = AmethystColor.copy(alpha = 0.8f), style = Stroke(width = 1.6f * scaleX))
 
-            // Inner Covert Feather 3 (Glowing accent tip)
+            // Inner Feather 3
             val feather3 = Path().apply {
                 moveTo(wingPivotX, wingPivotY)
-                lineTo(wingPivotX - wingWidth * 0.65f, wingPivotY - wingHeight * 0.25f)
+                lineTo(wingPivotX - wingWidth * 0.68f, wingPivotY - wingHeight * 0.28f)
                 quadraticTo(
-                    wingPivotX - wingWidth * 0.3f, wingPivotY + wingHeight * 0.35f,
+                    wingPivotX - wingWidth * 0.32f, wingPivotY + wingHeight * 0.38f,
                     wingPivotX, wingPivotY
                 )
                 close()
             }
-            drawPath(feather3, color = FeatherBlack)
-            drawPath(feather3, color = CyanColor.copy(alpha = 0.5f), style = Stroke(width = 1.2f * scaleX))
+            drawPath(feather3, color = Color(0xFF151026))
+            drawPath(feather3, color = CyanColor.copy(alpha = 0.6f), style = Stroke(width = 1.3f * scaleX))
         }
 
-        // 6. Draw SELECTED ACCESSORY (Detective Hat, Red Scarf, Wizard Hat, Golden Crown, Pilot Goggles)
+        // 7. Draw SELECTED ACCESSORY (Detective Hat, Red Scarf, Wizard Hat, Golden Crown, Pilot Goggles)
         drawAccessory(selectedAccessory, px, py, r, scaleX, scaleY, gameTicks)
     }
 }
