@@ -156,9 +156,12 @@ fun MainMenuScreen(
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Black,
                     color = MoonColor,
+                    fontSize = 42.sp,
                     letterSpacing = 1.sp,
                     textAlign = TextAlign.Center
                 ),
+                maxLines = 1,
+                softWrap = false,
                 modifier = Modifier.shadow(0.dp)
             )
 
@@ -1640,10 +1643,39 @@ fun PreviewCrow(accessoryId: String, modifier: Modifier = Modifier) {
         drawCircle(color = Color.Black, radius = r * 0.16f, center = Offset(cx + r * 0.4f, cy - r * 0.32f))
         drawCircle(color = CyanColor, radius = r * 0.05f, center = Offset(cx + r * 0.45f, cy - r * 0.36f))
 
-        // Wing shadow / background
+        // Animated multi-feather wing flapping
         val wingPivotX = cx - r * 0.1f
         val wingPivotY = cy + r * 0.1f
-        drawCircle(color = FeatherBlack, radius = r * 0.55f, center = Offset(wingPivotX, wingPivotY))
+        val wingWidth = r * 1.25f
+        val wingHeight = r * 0.75f
+
+        rotate(degrees = wingAngle, pivot = Offset(wingPivotX, wingPivotY)) {
+            val spread = ((wingAngle + 15f) / 30f).coerceIn(0f, 1f)
+
+            val feather1 = Path().apply {
+                moveTo(wingPivotX, wingPivotY)
+                lineTo(wingPivotX - wingWidth * 1.05f, wingPivotY - wingHeight * (0.8f + 0.2f * spread))
+                quadraticTo(
+                    wingPivotX - wingWidth * 0.5f, wingPivotY + wingHeight * 0.4f,
+                    wingPivotX, wingPivotY
+                )
+                close()
+            }
+            drawPath(feather1, color = FeatherBlack)
+            drawPath(feather1, color = PurpleColor.copy(alpha = 0.8f), style = Stroke(width = 1.8f * density))
+
+            val feather2 = Path().apply {
+                moveTo(wingPivotX, wingPivotY)
+                lineTo(wingPivotX - wingWidth * 0.8f, wingPivotY - wingHeight * 0.45f)
+                quadraticTo(
+                    wingPivotX - wingWidth * 0.4f, wingPivotY + wingHeight * 0.4f,
+                    wingPivotX, wingPivotY
+                )
+                close()
+            }
+            drawPath(feather2, color = FeatherBlack)
+            drawPath(feather2, color = CyanColor.copy(alpha = 0.5f), style = Stroke(width = 1.3f * density))
+        }
 
         // Draw accessory on preview
         drawAccessoryPreview(accessoryId, cx, cy, r, density)

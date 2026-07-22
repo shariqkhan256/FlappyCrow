@@ -151,6 +151,7 @@ fun FlappyCrowGame(
     var playerAngle by remember { mutableStateOf(0f) }
     var wingAngle by remember { mutableStateOf(0f) }
     var wingDirection by remember { mutableStateOf(1) } // 1 down, -1 up
+    var flapFrameTicks by remember { mutableStateOf(0) } // Sprite-swap / keyframe flap animation timer
 
     // Animation frame counters
     var gameTicks by remember { mutableStateOf(0L) }
@@ -253,6 +254,7 @@ fun FlappyCrowGame(
                 isStarted = true
             }
             playerVelocity = flapStrength
+            flapFrameTicks = 14 // Trigger rapid 4-stage keyframe wing flap sequence
             triggerVibration(15)
             RetroAudioEngine.playFlap(isSoundEnabled)
 
@@ -305,14 +307,24 @@ fun FlappyCrowGame(
                     break
                 }
 
-                // Smooth wing animation
-                if (playerVelocity < 0) {
+                // Multi-stage keyframe wing flap animation (sprite-frame sequence)
+                if (flapFrameTicks > 0) {
+                    flapFrameTicks--
+                    // 4-frame keyframe cycle: FRAME_UP (-42°), FRAME_MID_UP (-18°), FRAME_DOWN (38°), FRAME_MID_RECOVERY (8°)
+                    val frameIndex = (14 - flapFrameTicks) % 4
+                    wingAngle = when (frameIndex) {
+                        0 -> -42f // Wings high up on upstroke
+                        1 -> -18f // Wings transitioning down
+                        2 -> 38f  // Wings down on power flap
+                        else -> 8f // Wings recovering to gliding position
+                    }
+                } else if (playerVelocity < 0) {
                     // Flapping up rapidly
-                    wingAngle += 8f * wingDirection
-                    if (abs(wingAngle) > 25f) wingDirection *= -1
+                    wingAngle += 10f * wingDirection
+                    if (abs(wingAngle) > 30f) wingDirection *= -1
                 } else {
-                    // Gliding/falling slowly
-                    wingAngle = sin(gameTicks * 0.15f) * 12f
+                    // Gliding/falling flight oscillation
+                    wingAngle = sin(gameTicks * 0.18f) * 14f
                 }
 
                 // Smooth rotation angle based on velocity
@@ -1407,26 +1419,54 @@ private fun DrawScope.drawPlayer(
             )
         }
 
-        // 5. Wings (rotating flaps)
-        // Draw the main wing layered on top of body
-        val wingWidth = r * 1.2f
-        val wingHeight = r * 0.7f
+        // 5. Wings (multi-feather keyframe sprite-like flapping)
+        val wingWidth = r * 1.3f
+        val wingHeight = r * 0.75f
         val wingPivotX = px - r * 0.1f
         val wingPivotY = py + r * 0.1f
-        
+
         rotate(degrees = wingAngle, pivot = Offset(wingPivotX, wingPivotY)) {
-            // Wing Path
-            val wingPath = Path().apply {
+            // Feather spread factor based on keyframe wing position (-45° = spread open, +40° = folded)
+            val spread = ((wingAngle + 45f) / 85f).coerceIn(0f, 1f)
+
+            // Primary Feather 1 (Longest outer flight feather)
+            val feather1 = Path().apply {
                 moveTo(wingPivotX, wingPivotY)
-                lineTo(wingPivotX - wingWidth, wingPivotY - wingHeight)
+                lineTo(wingPivotX - wingWidth * 1.1f, wingPivotY - wingHeight * (0.85f + 0.25f * spread))
                 quadraticTo(
-                    wingPivotX - wingWidth * 0.5f, wingPivotY + wingHeight * 0.5f,
+                    wingPivotX - wingWidth * 0.55f, wingPivotY + wingHeight * 0.4f,
                     wingPivotX, wingPivotY
                 )
                 close()
             }
-            drawPath(wingPath, color = FeatherBlack)
-            drawPath(wingPath, color = FeatherHighlight, style = Stroke(width = 1.5f * scaleX))
+            drawPath(feather1, color = FeatherBlack)
+            drawPath(feather1, color = FeatherHighlight, style = Stroke(width = 1.8f * scaleX))
+
+            // Secondary Feather 2 (Middle covert feather)
+            val feather2 = Path().apply {
+                moveTo(wingPivotX, wingPivotY)
+                lineTo(wingPivotX - wingWidth * 0.9f, wingPivotY - wingHeight * (0.55f - 0.2f * spread))
+                quadraticTo(
+                    wingPivotX - wingWidth * 0.45f, wingPivotY + wingHeight * 0.45f,
+                    wingPivotX, wingPivotY
+                )
+                close()
+            }
+            drawPath(feather2, color = FeatherBlack)
+            drawPath(feather2, color = AmethystColor.copy(alpha = 0.6f), style = Stroke(width = 1.4f * scaleX))
+
+            // Inner Covert Feather 3 (Glowing accent tip)
+            val feather3 = Path().apply {
+                moveTo(wingPivotX, wingPivotY)
+                lineTo(wingPivotX - wingWidth * 0.65f, wingPivotY - wingHeight * 0.25f)
+                quadraticTo(
+                    wingPivotX - wingWidth * 0.3f, wingPivotY + wingHeight * 0.35f,
+                    wingPivotX, wingPivotY
+                )
+                close()
+            }
+            drawPath(feather3, color = FeatherBlack)
+            drawPath(feather3, color = CyanColor.copy(alpha = 0.5f), style = Stroke(width = 1.2f * scaleX))
         }
 
         // 6. Draw SELECTED ACCESSORY (Detective Hat, Red Scarf, Wizard Hat, Golden Crown, Pilot Goggles)
