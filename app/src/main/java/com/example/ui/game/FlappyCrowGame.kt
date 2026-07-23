@@ -127,6 +127,7 @@ fun FlappyCrowGame(
     highScore: Int = 0,
     isSoundEnabled: Boolean,
     isVibrationEnabled: Boolean,
+    onToggleSound: () -> Unit = {},
     onGameOver: (score: Int, coins: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -904,6 +905,7 @@ fun FlappyCrowGame(
                                 .clip(RoundedCornerShape(14.dp))
                                 .clickable {
                                     soundOn = !soundOn
+                                    onToggleSound()
                                     RetroAudioEngine.playButtonClick(soundOn)
                                 }
                                 .background(Color.White.copy(alpha = 0.06f))
@@ -931,6 +933,7 @@ fun FlappyCrowGame(
                                 checked = soundOn,
                                 onCheckedChange = {
                                     soundOn = it
+                                    onToggleSound()
                                     RetroAudioEngine.playButtonClick(soundOn)
                                 },
                                 colors = SwitchDefaults.colors(
@@ -939,7 +942,9 @@ fun FlappyCrowGame(
                                     uncheckedThumbColor = DimColor,
                                     uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
                                 ),
-                                modifier = Modifier.height(24.dp)
+                                modifier = Modifier
+                                    .height(24.dp)
+                                    .testTag("sound_toggle_switch")
                             )
                         }
 
