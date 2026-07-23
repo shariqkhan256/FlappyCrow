@@ -401,7 +401,7 @@ fun FlappyCrowGame(
                         obs.passed = true
                         score++
                         triggerVibration(25)
-                        RetroAudioEngine.playCoin(isSoundEnabled)
+                        RetroAudioEngine.playPoint(isSoundEnabled)
                         
                         // Particle celebration burst when score increases
                         for (i in 1..6) {
