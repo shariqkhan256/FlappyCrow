@@ -4,15 +4,21 @@ import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -118,8 +124,10 @@ data class BackgroundBat(
 @Composable
 fun FlappyCrowGame(
     selectedAccessory: String,
+    highScore: Int = 0,
     isSoundEnabled: Boolean,
     isVibrationEnabled: Boolean,
+    onToggleSound: () -> Unit = {},
     onGameOver: (score: Int, coins: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -131,6 +139,7 @@ fun FlappyCrowGame(
     var coinsCollected by remember { mutableStateOf(0) }
     var isPaused by remember { mutableStateOf(false) }
     var isStarted by remember { mutableStateOf(false) }
+    var soundOn by remember(isSoundEnabled) { mutableStateOf(isSoundEnabled) }
 
     // Virtual Game Screen Dimensions (relative mapping)
     val virtualWidth = 360f
@@ -147,12 +156,15 @@ fun FlappyCrowGame(
     var playerAngle by remember { mutableStateOf(0f) }
     var wingAngle by remember { mutableStateOf(0f) }
     var wingDirection by remember { mutableStateOf(1) } // 1 down, -1 up
+    var flapFrameTicks by remember { mutableStateOf(0) } // Sprite-swap / keyframe flap animation timer
 
     // Animation frame counters
     var gameTicks by remember { mutableStateOf(0L) }
 
     // Screen shake / Red flash feedback
     var shakeDuration by remember { mutableStateOf(0) }
+    var shakeOffsetX by remember { mutableStateOf(0f) }
+    var shakeOffsetY by remember { mutableStateOf(0f) }
     var collisionFlash by remember { mutableStateOf(false) }
 
     // Object lists
@@ -236,6 +248,8 @@ fun FlappyCrowGame(
         isPaused = false
         isStarted = false
         shakeDuration = 0
+        shakeOffsetX = 0f
+        shakeOffsetY = 0f
         collisionFlash = false
         obstacles.clear()
         collectibles.clear()
@@ -249,7 +263,9 @@ fun FlappyCrowGame(
                 isStarted = true
             }
             playerVelocity = flapStrength
+            flapFrameTicks = 14 // Trigger rapid 4-stage keyframe wing flap sequence
             triggerVibration(15)
+            RetroAudioEngine.playFlap(soundOn)
 
             // Spawn cute feather particles trailing behind
             for (i in 0..3) {
@@ -292,21 +308,42 @@ fun FlappyCrowGame(
                 // Handle hitting the ground
                 if (playerY > virtualHeight - 20f) {
                     collisionFlash = true
-                    shakeDuration = 15
-                    triggerVibration(120)
-                    delay(300)
+                    triggerVibration(150)
+                    RetroAudioEngine.playHit(soundOn)
+
+                    // Dynamic 320ms screen shake loop
+                    val totalSteps = 20
+                    for (step in 1..totalSteps) {
+                        val intensity = (1f - (step.toFloat() / totalSteps)) * 14f
+                        shakeOffsetX = (Random.nextFloat() * 2f - 1f) * intensity
+                        shakeOffsetY = (Random.nextFloat() * 2f - 1f) * intensity
+                        delay(16)
+                    }
+                    shakeOffsetX = 0f
+                    shakeOffsetY = 0f
+
                     onGameOver(score, coinsCollected)
                     break
                 }
 
-                // Smooth wing animation
-                if (playerVelocity < 0) {
+                // Multi-stage keyframe wing flap animation (sprite-frame sequence)
+                if (flapFrameTicks > 0) {
+                    flapFrameTicks--
+                    // 4-frame keyframe cycle: FRAME_UP (-42°), FRAME_MID_UP (-18°), FRAME_DOWN (38°), FRAME_MID_RECOVERY (8°)
+                    val frameIndex = (14 - flapFrameTicks) % 4
+                    wingAngle = when (frameIndex) {
+                        0 -> -42f // Wings high up on upstroke
+                        1 -> -18f // Wings transitioning down
+                        2 -> 38f  // Wings down on power flap
+                        else -> 8f // Wings recovering to gliding position
+                    }
+                } else if (playerVelocity < 0) {
                     // Flapping up rapidly
-                    wingAngle += 8f * wingDirection
-                    if (abs(wingAngle) > 25f) wingDirection *= -1
+                    wingAngle += 10f * wingDirection
+                    if (abs(wingAngle) > 30f) wingDirection *= -1
                 } else {
-                    // Gliding/falling slowly
-                    wingAngle = sin(gameTicks * 0.15f) * 12f
+                    // Gliding/falling flight oscillation
+                    wingAngle = sin(gameTicks * 0.18f) * 14f
                 }
 
                 // Smooth rotation angle based on velocity
@@ -383,6 +420,7 @@ fun FlappyCrowGame(
                         obs.passed = true
                         score++
                         triggerVibration(25)
+                        RetroAudioEngine.playPoint(soundOn)
                         
                         // Particle celebration burst when score increases
                         for (i in 1..6) {
@@ -428,6 +466,7 @@ fun FlappyCrowGame(
                         }
                         coinsCollected += value
                         triggerVibration(30)
+                        RetroAudioEngine.playCoin(soundOn)
 
                         // Gold/Orange sparkles on collect
                         val sparkColor = when(col.type) {
@@ -512,9 +551,20 @@ fun FlappyCrowGame(
 
                 if (hitObstacle) {
                     collisionFlash = true
-                    shakeDuration = 18
                     triggerVibration(200)
-                    delay(350)
+                    RetroAudioEngine.playHit(soundOn)
+
+                    // Dynamic 360ms screen shake loop
+                    val totalSteps = 22
+                    for (step in 1..totalSteps) {
+                        val intensity = (1f - (step.toFloat() / totalSteps)) * 18f
+                        shakeOffsetX = (Random.nextFloat() * 2f - 1f) * intensity
+                        shakeOffsetY = (Random.nextFloat() * 2f - 1f) * intensity
+                        delay(16)
+                    }
+                    shakeOffsetX = 0f
+                    shakeOffsetY = 0f
+
                     onGameOver(score, coinsCollected)
                     break
                 }
@@ -547,8 +597,8 @@ fun FlappyCrowGame(
             val scaleY = size.height / virtualHeight
 
             // Apply Screenshake translation
-            val shakeX = if (shakeDuration > 0) Random.nextInt(-6, 7).toFloat() * scaleX else 0f
-            val shakeY = if (shakeDuration > 0) Random.nextInt(-6, 7).toFloat() * scaleY else 0f
+            val shakeX = (shakeOffsetX + (if (shakeDuration > 0) Random.nextInt(-6, 7).toFloat() else 0f)) * scaleX
+            val shakeY = (shakeOffsetY + (if (shakeDuration > 0) Random.nextInt(-6, 7).toFloat() else 0f)) * scaleY
 
             translate(left = shakeX, top = shakeY) {
                 // 1. Draw Magical Moonlit Sky background
@@ -591,9 +641,9 @@ fun FlappyCrowGame(
                 )
 
                 // 6. Draw Red Collision Flash Overlay
-                if (collisionFlash && shakeDuration > 0) {
+                if (collisionFlash && (shakeOffsetX != 0f || shakeOffsetY != 0f || shakeDuration > 0)) {
                     drawRect(
-                        color = Color.Red.copy(alpha = 0.25f),
+                        color = Color.Red.copy(alpha = 0.35f),
                         topLeft = Offset.Zero,
                         size = size
                     )
@@ -650,120 +700,318 @@ fun FlappyCrowGame(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Score & Coins
-            Column {
+            // Left: Score & Best floating card with neon borders
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Navy2Color.copy(alpha = 0.75f))
+                    .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.4f)), RoundedCornerShape(16.dp))
+            ) {
                 Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "SCORE: ",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            color = NightOnBackground,
-                            fontWeight = FontWeight.Bold
+                        text = "SCORE ",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = AmethystColor,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
                         )
                     )
                     Text(
                         text = "$score",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            color = NightSecondary,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 24.sp
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = CyanColor,
+                            fontWeight = FontWeight.Black
                         )
                     )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    // Small golden coin icon
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(NightTertiary)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
                     Text(
-                        text = "COINS: ",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = NightOnBackground,
-                            fontWeight = FontWeight.Bold
+                        text = "BEST ",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = DimColor,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
                         )
                     )
                     Text(
-                        text = "$coinsCollected",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = NightTertiary,
-                            fontWeight = FontWeight.Bold
+                        text = "${max(score, highScore)}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = GoldColor,
+                            fontWeight = FontWeight.Black
                         )
                     )
                 }
             }
 
-            // Right: Pause Control
-            IconButton(
-                onClick = { isPaused = !isPaused },
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(NightSurface)
-                    .size(44.dp)
-                    .testTag("pause_button")
+            // Right: Coins floating pill + Pause Control
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                    contentDescription = "Pause Game",
-                    tint = NightSecondary
-                )
+                // Coins pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Navy2Color.copy(alpha = 0.75f))
+                        .border(BorderStroke(1.dp, GoldColor.copy(alpha = 0.3f)), RoundedCornerShape(12.dp))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(GoldColor)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "$coinsCollected",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = GoldColor,
+                                fontWeight = FontWeight.Black
+                            )
+                        )
+                    }
+                }
+
+                // Pause Button
+                IconButton(
+                    onClick = {
+                        RetroAudioEngine.playButtonClick(soundOn)
+                        isPaused = !isPaused
+                    },
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Navy2Color.copy(alpha = 0.85f))
+                        .border(BorderStroke(1.5.dp, AmethystColor.copy(alpha = 0.6f)), CircleShape)
+                        .size(44.dp)
+                        .testTag("pause_button")
+                ) {
+                    Icon(
+                        imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                        contentDescription = "Pause Game",
+                        tint = CyanColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
 
-        // Pause Overlay
+        // Overlay Pause Menu
         if (isPaused) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .clickable { /* swallow clicks */ },
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { /* Swallow touch events */ },
                 contentAlignment = Alignment.Center
             ) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = NightSurface),
-                    modifier = Modifier.width(280.dp),
-                    shape = MaterialTheme.shapes.large
+                    colors = CardDefaults.cardColors(containerColor = Navy2Color),
+                    modifier = Modifier
+                        .width(300.dp)
+                        .testTag("pause_menu_card"),
+                    shape = RoundedCornerShape(28.dp),
+                    border = BorderStroke(2.dp, Brush.horizontalGradient(listOf(CyanColor, AmethystColor)))
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(24.dp)
                     ) {
+                        // Pause Badge Icon
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(AmethystColor.copy(alpha = 0.25f))
+                                .border(BorderStroke(1.5.dp, AmethystColor), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Pause,
+                                contentDescription = null,
+                                tint = CyanColor,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
                         Text(
                             text = "GAME PAUSED",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = NightPrimary
+                                fontWeight = FontWeight.Black,
+                                color = MoonColor,
+                                letterSpacing = 1.2.sp
                             )
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Score so far: $score",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = NightOnSurface)
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Stats Summary Row (Score & Coins)
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(NavyColor.copy(alpha = 0.8f))
+                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), RoundedCornerShape(16.dp))
+                                .padding(vertical = 12.dp, horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "SCORE",
+                                    style = MaterialTheme.typography.labelSmall.copy(color = DimColor, fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "$score",
+                                    style = MaterialTheme.typography.titleMedium.copy(color = MoonColor, fontWeight = FontWeight.Black)
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(24.dp)
+                                    .background(Color.White.copy(alpha = 0.15f))
+                            )
+
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "COINS",
+                                    style = MaterialTheme.typography.labelSmall.copy(color = DimColor, fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "$coinsCollected",
+                                    style = MaterialTheme.typography.titleMedium.copy(color = GoldColor, fontWeight = FontWeight.Black)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Sound Toggle Option
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable {
+                                    soundOn = !soundOn
+                                    onToggleSound()
+                                    RetroAudioEngine.playButtonClick(soundOn)
+                                }
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (soundOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                    contentDescription = "Sound Toggle",
+                                    tint = if (soundOn) CyanColor else DimColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Sound Effects",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MoonColor,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                )
+                            }
+                            Switch(
+                                checked = soundOn,
+                                onCheckedChange = {
+                                    soundOn = it
+                                    onToggleSound()
+                                    RetroAudioEngine.playButtonClick(soundOn)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = CyanColor,
+                                    uncheckedThumbColor = DimColor,
+                                    uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier
+                                    .height(24.dp)
+                                    .testTag("sound_toggle_switch")
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Action Buttons: Resume & Restart
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Button(
-                                onClick = { restartGame() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
-                                modifier = Modifier.weight(1f)
+                                onClick = {
+                                    RetroAudioEngine.playButtonClick(soundOn)
+                                    isPaused = false
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MagentaColor),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("resume_button"),
+                                shape = RoundedCornerShape(14.dp)
                             ) {
-                                Text("RESTART", style = MaterialTheme.typography.bodyMedium)
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = MoonColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "RESUME GAME",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MoonColor,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                )
                             }
-                            Button(
-                                onClick = { isPaused = false },
-                                colors = ButtonDefaults.buttonColors(containerColor = NightSecondary),
-                                modifier = Modifier.weight(1f)
+
+                            OutlinedButton(
+                                onClick = {
+                                    RetroAudioEngine.playButtonClick(soundOn)
+                                    restartGame()
+                                },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MoonColor),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("restart_button"),
+                                shape = RoundedCornerShape(14.dp)
                             ) {
-                                Text("RESUME", style = MaterialTheme.typography.bodyMedium)
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = DimColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "RESTART",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MoonColor,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                )
                             }
                         }
                     }
@@ -783,111 +1031,186 @@ private fun DrawScope.drawNightSky(
     size: Size,
     gameTicks: Long
 ) {
-    // 1. Draw radial glowing gradient for deep cosmic atmosphere
+    // 1. Draw smooth vertical pastel night sky gradient matching the poster
     drawRect(
-        brush = Brush.radialGradient(
-            colors = listOf(Color(0xFF1B0B3C), Color(0xFF040209)),
-            center = Offset(size.width * 0.5f, size.height * 0.3f),
-            radius = size.height * 0.8f
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF3D2766), // Soft lavender purple top sky
+                Color(0xFF261947), // Deep indigo mid sky
+                Color(0xFF140C2C)  // Midnight violet horizon
+            )
         ),
         topLeft = Offset.Zero,
         size = size
     )
 
-    // 2. Draw Twinkling Stars
-    stars.toList().forEach { star ->
-        drawCircle(
-            color = SparkleWhite.copy(alpha = star.brightness),
-            radius = star.size * scaleX,
-            center = Offset(star.x * scaleX, star.y * scaleY)
-        )
+    // 2. Draw Twinkling Stars & Diamond Sparkle Stars
+    stars.toList().forEachIndexed { index, star ->
+        val starX = star.x * scaleX
+        val starY = star.y * scaleY
+        val starRadius = star.size * scaleX
+
+        if (index % 4 == 0) {
+            // Diamond 4-point sparkle star
+            val sparkleSize = starRadius * 2.2f * star.brightness
+            val starPath = Path().apply {
+                moveTo(starX, starY - sparkleSize)
+                quadraticTo(starX, starY, starX + sparkleSize, starY)
+                quadraticTo(starX, starY, starX, starY + sparkleSize)
+                quadraticTo(starX, starY, starX - sparkleSize, starY)
+                quadraticTo(starX, starY, starX, starY - sparkleSize)
+                close()
+            }
+            drawPath(starPath, color = Color(0xFFE1D5FF).copy(alpha = star.brightness.coerceAtMost(0.9f)))
+        } else {
+            // Soft round star
+            drawCircle(
+                color = Color.White.copy(alpha = star.brightness),
+                radius = starRadius,
+                center = Offset(starX, starY)
+            )
+        }
     }
 
-    // 3. Draw Huge Glowing Moon
-    val moonCenterX = 280f * scaleX
-    val moonCenterY = 120f * scaleY
-    val moonRadius = 45f * scaleX
+    // 3. Draw Huge Friendly Moon with Soft Layered Glowing Halos
+    val moonCenterX = size.width * 0.78f
+    val moonCenterY = size.height * 0.16f
+    val moonRadius = 48f * scaleX
 
-    // Outer moon glow
+    // Concentric soft golden glow rings
     drawCircle(
-        color = NightTertiary.copy(alpha = 0.15f),
-        radius = moonRadius + 15f * scaleX,
+        color = Color(0xFFFFF59D).copy(alpha = 0.08f),
+        radius = moonRadius * 2.1f,
         center = Offset(moonCenterX, moonCenterY)
     )
-    // Core Moon
     drawCircle(
-        color = Color(0xFFFFF9D8),
+        color = Color(0xFFFFF59D).copy(alpha = 0.15f),
+        radius = moonRadius * 1.5f,
+        center = Offset(moonCenterX, moonCenterY)
+    )
+    drawCircle(
+        color = Color(0xFFFFF59D).copy(alpha = 0.28f),
+        radius = moonRadius * 1.18f,
+        center = Offset(moonCenterX, moonCenterY)
+    )
+
+    // Main Moon Core Disc with soft radial gradient
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color(0xFFFFFDE7), // Luminous cream center
+                Color(0xFFFFF59D), // Soft pastel yellow
+                Color(0xFFFFD54F)  // Warm golden edge
+            ),
+            center = Offset(moonCenterX - moonRadius * 0.2f, moonCenterY - moonRadius * 0.2f),
+            radius = moonRadius * 1.2f
+        ),
         radius = moonRadius,
         center = Offset(moonCenterX, moonCenterY)
     )
-    // Subtle crater/shadow detail inside the moon
+
+    // Soft crater details on the moon
     drawCircle(
-        color = Color(0xFFEADB9E).copy(alpha = 0.6f),
-        radius = moonRadius * 0.25f,
-        center = Offset(moonCenterX - moonRadius * 0.3f, moonCenterY - moonRadius * 0.2f)
+        color = Color(0xFFFBC02D).copy(alpha = 0.35f),
+        radius = moonRadius * 0.22f,
+        center = Offset(moonCenterX - moonRadius * 0.32f, moonCenterY - moonRadius * 0.18f)
     )
     drawCircle(
-        color = Color(0xFFEADB9E).copy(alpha = 0.6f),
-        radius = moonRadius * 0.15f,
-        center = Offset(moonCenterX + moonRadius * 0.2f, moonCenterY + moonRadius * 0.3f)
+        color = Color(0xFFFBC02D).copy(alpha = 0.3f),
+        radius = moonRadius * 0.16f,
+        center = Offset(moonCenterX + moonRadius * 0.25f, moonCenterY + moonRadius * 0.32f)
     )
 
-    // 4. Draw Parallax Background Silhouette of Magical City
+    // 4. Draw Drifting Puffy Clouds
+    clouds.toList().forEach { cloud ->
+        val cloudX = cloud.x * scaleX
+        val cloudY = cloud.y * scaleY
+        val cloudR = 28f * scaleX * cloud.scale
+
+        // Cloud body gradient
+        val cloudBrush = Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF7E57C2).copy(alpha = 0.35f),
+                Color(0xFF38235C).copy(alpha = 0.45f)
+            ),
+            startY = cloudY - cloudR,
+            endY = cloudY + cloudR
+        )
+
+        drawCircle(
+            brush = cloudBrush,
+            radius = cloudR,
+            center = Offset(cloudX, cloudY)
+        )
+        drawCircle(
+            brush = cloudBrush,
+            radius = cloudR * 0.78f,
+            center = Offset(cloudX - cloudR * 0.62f, cloudY + cloudR * 0.12f)
+        )
+        drawCircle(
+            brush = cloudBrush,
+            radius = cloudR * 0.78f,
+            center = Offset(cloudX + cloudR * 0.62f, cloudY + cloudR * 0.12f)
+        )
+    }
+
+    // 5. Parallax City Silhouette with Warm Glowing Windows
     val buildingWidth = size.width / 10f
     for (i in 0..10) {
         val buildingHeight = (buildings.getOrNull(i) ?: 100f) * scaleY
         val left = i * buildingWidth
         val top = size.height - buildingHeight
-        
+
         drawRect(
-            color = Color(0xFF140D2C).copy(alpha = 0.65f),
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF281C4A).copy(alpha = 0.85f),
+                    Color(0xFF160E2E).copy(alpha = 0.95f)
+                ),
+                startY = top,
+                endY = size.height
+            ),
             topLeft = Offset(left, top),
             size = Size(buildingWidth + 2f, buildingHeight)
         )
 
-        // Draw small warm yellow windows on some background buildings
+        // Building rooftop stroke accent
+        drawLine(
+            color = Color(0xFF80DEEA).copy(alpha = 0.35f),
+            start = Offset(left, top),
+            end = Offset(left + buildingWidth + 2f, top),
+            strokeWidth = 2f * scaleX
+        )
+
+        // Cozy glowing warm orange/yellow windows
         if (i % 2 == 0) {
-            val winSize = 4f * scaleX
-            val winX = left + buildingWidth * 0.4f
-            val winY = top + buildingHeight * 0.3f
-            drawRect(
-                color = NightAccentOrange.copy(alpha = 0.7f),
-                topLeft = Offset(winX, winY),
-                size = Size(winSize, winSize * 1.5f)
+            val winSize = 5f * scaleX
+            val winX = left + buildingWidth * 0.38f
+            val winY = top + buildingHeight * 0.28f
+
+            drawCircle(
+                color = Color(0xFFFFB300).copy(alpha = 0.3f),
+                radius = winSize * 2.2f,
+                center = Offset(winX + winSize / 2f, winY + winSize)
             )
-            drawRect(
-                color = NightAccentOrange.copy(alpha = 0.7f),
-                topLeft = Offset(winX + 12f * scaleX, winY + 20f * scaleY),
-                size = Size(winSize, winSize * 1.5f)
+            drawRoundRect(
+                color = Color(0xFFFFD54F),
+                topLeft = Offset(winX, winY),
+                size = Size(winSize, winSize * 1.6f),
+                cornerRadius = CornerRadius(2f * scaleX)
+            )
+
+            drawRoundRect(
+                color = Color(0xFFFFD54F),
+                topLeft = Offset(winX + 13f * scaleX, winY + 18f * scaleY),
+                size = Size(winSize, winSize * 1.6f),
+                cornerRadius = CornerRadius(2f * scaleX)
             )
         }
     }
-
-    // 5. Draw drifting puffy clouds
-    clouds.toList().forEach { cloud ->
-        val cloudX = cloud.x * scaleX
-        val cloudY = cloud.y * scaleY
-        val cloudR = 25f * scaleX * cloud.scale
-
-        drawCircle(
-            color = Color(0xFF4C3B78).copy(alpha = 0.3f),
-            radius = cloudR,
-            center = Offset(cloudX, cloudY)
-        )
-        drawCircle(
-            color = Color(0xFF4C3B78).copy(alpha = 0.3f),
-            radius = cloudR * 0.8f,
-            center = Offset(cloudX - cloudR * 0.6f, cloudY + cloudR * 0.1f)
-        )
-        drawCircle(
-            color = Color(0xFF4C3B78).copy(alpha = 0.3f),
-            radius = cloudR * 0.8f,
-            center = Offset(cloudX + cloudR * 0.6f, cloudY + cloudR * 0.1f)
-        )
-    }
 }
 
-// Draw the customized obstacles (Chimney, PowerLine, CastleTower, TreeBranch, FlyingObstacle)
+// Draw the customized obstacles (3D Vibrant Cartoon Pipes/Pillars matching poster aesthetic)
 private fun DrawScope.drawObstacle(
     obs: Obstacle,
     scaleX: Float,
@@ -903,231 +1226,276 @@ private fun DrawScope.drawObstacle(
 
     when (obs.type) {
         ObstacleType.Chimney -> {
-            // --- TOP CHIMNEY ---
-            // Draw Main Brick Body
+            // --- 3D VIBRANT CARTOON PILLARS (Pipes matching poster) ---
+            val capExtra = 8f * scaleX
+            val capHeight = 22f * scaleY
+
+            // Pillar 3D Body Gradient (Dark shadow -> Rich purple/indigo -> Bright sheen -> Dark shadow)
+            val pillarBrush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF221542), // Dark left shadow
+                    Color(0xFF5E35B1), // Vibrant indigo-purple mid
+                    Color(0xFF8E62D0), // Bright highlight stripe
+                    Color(0xFF4527A0), // Deep purple right
+                    Color(0xFF190F30)  // Dark right shadow edge
+                ),
+                start = Offset(left, 0f),
+                end = Offset(right, 0f)
+            )
+
+            val capBrush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF2A1B50),
+                    Color(0xFF7E57C2),
+                    Color(0xFFB388FF),
+                    Color(0xFF512DA8),
+                    Color(0xFF1F133B)
+                ),
+                start = Offset(left - capExtra, 0f),
+                end = Offset(right + capExtra, 0f)
+            )
+
+            // --- TOP PILLAR ---
+            // Main body
             drawRect(
-                color = Color(0xFF8B2500), // Brick Red
+                brush = pillarBrush,
                 topLeft = Offset(left, 0f),
                 size = Size(width, gapTop)
             )
-            // Ledge collar at bottom
-            val ledgeHeight = 16f * scaleY
-            val ledgeWidthExtra = 6f * scaleX
-            drawRoundRect(
-                color = Color(0xFFA0360F),
-                topLeft = Offset(left - ledgeWidthExtra, gapTop - ledgeHeight),
-                size = Size(width + ledgeWidthExtra * 2f, ledgeHeight),
-                cornerRadius = CornerRadius(4f * scaleX)
+            // Left gloss sheen line
+            drawLine(
+                color = Color.White.copy(alpha = 0.35f),
+                start = Offset(left + width * 0.28f, 0f),
+                end = Offset(left + width * 0.28f, gapTop - capHeight),
+                strokeWidth = 2.5f * scaleX
             )
-            // Smoke soot border on bottom
-            drawRect(
-                color = Color(0xFF2B211E),
-                topLeft = Offset(left, gapTop - 3f * scaleY),
-                size = Size(width, 3f * scaleY)
+            // Brick grid lines
+            for (yStep in 30..gapTop.toInt() step 32) {
+                drawLine(
+                    color = Color(0xFFB388FF).copy(alpha = 0.25f),
+                    start = Offset(left + 2f * scaleX, yStep * scaleY),
+                    end = Offset(right - 2f * scaleX, yStep * scaleY),
+                    strokeWidth = 1.2f * scaleX
+                )
+            }
+            // 3D Cap Collar
+            drawRoundRect(
+                brush = capBrush,
+                topLeft = Offset(left - capExtra, gapTop - capHeight),
+                size = Size(width + capExtra * 2f, capHeight),
+                cornerRadius = CornerRadius(6f * scaleX)
+            )
+            // Glowing cyan rim trim along gap edge
+            drawRoundRect(
+                color = Color(0xFF80DEEA),
+                topLeft = Offset(left - capExtra, gapTop - 3.5f * scaleY),
+                size = Size(width + capExtra * 2f, 3.5f * scaleY),
+                cornerRadius = CornerRadius(2f * scaleX)
+            )
+            // White highlight stroke on top of cap
+            drawLine(
+                color = Color.White.copy(alpha = 0.6f),
+                start = Offset(left - capExtra + 4f * scaleX, gapTop - capHeight + 2f * scaleY),
+                end = Offset(right + capExtra - 4f * scaleX, gapTop - capHeight + 2f * scaleY),
+                strokeWidth = 2f * scaleX,
+                cap = StrokeCap.Round
             )
 
-            // --- BOTTOM CHIMNEY ---
-            // Draw Main Brick Body
-            val bottomChimneyHeight = size.height - gapBottom
+            // --- BOTTOM PILLAR ---
+            val bottomHeight = size.height - gapBottom
+            // Main body
             drawRect(
-                color = Color(0xFF8B2500),
+                brush = pillarBrush,
                 topLeft = Offset(left, gapBottom),
-                size = Size(width, bottomChimneyHeight)
+                size = Size(width, bottomHeight)
             )
-            // Ledge collar at top
+            // Left gloss sheen line
+            drawLine(
+                color = Color.White.copy(alpha = 0.35f),
+                start = Offset(left + width * 0.28f, gapBottom + capHeight),
+                end = Offset(left + width * 0.28f, size.height),
+                strokeWidth = 2.5f * scaleX
+            )
+            // Brick grid lines
+            for (yStep in gapBottom.toInt() + 32..size.height.toInt() step 32) {
+                drawLine(
+                    color = Color(0xFFB388FF).copy(alpha = 0.25f),
+                    start = Offset(left + 2f * scaleX, yStep.toFloat()),
+                    end = Offset(right - 2f * scaleX, yStep.toFloat()),
+                    strokeWidth = 1.2f * scaleX
+                )
+            }
+            // 3D Cap Collar
             drawRoundRect(
-                color = Color(0xFFA0360F),
-                topLeft = Offset(left - ledgeWidthExtra, gapBottom),
-                size = Size(width + ledgeWidthExtra * 2f, ledgeHeight),
-                cornerRadius = CornerRadius(4f * scaleX)
+                brush = capBrush,
+                topLeft = Offset(left - capExtra, gapBottom),
+                size = Size(width + capExtra * 2f, capHeight),
+                cornerRadius = CornerRadius(6f * scaleX)
             )
-            // Smoke soot border on top
-            drawRect(
-                color = Color(0xFF2B211E),
-                topLeft = Offset(left, gapBottom),
-                size = Size(width, 3f * scaleY)
+            // Glowing cyan rim trim along gap edge
+            drawRoundRect(
+                color = Color(0xFF80DEEA),
+                topLeft = Offset(left - capExtra, gapBottom),
+                size = Size(width + capExtra * 2f, 3.5f * scaleY),
+                cornerRadius = CornerRadius(2f * scaleX)
+            )
+            // White highlight stroke on bottom edge of cap
+            drawLine(
+                color = Color.White.copy(alpha = 0.6f),
+                start = Offset(left - capExtra + 4f * scaleX, gapBottom + capHeight - 2f * scaleY),
+                end = Offset(right + capExtra - 4f * scaleX, gapBottom + capHeight - 2f * scaleY),
+                strokeWidth = 2f * scaleX,
+                cap = StrokeCap.Round
             )
         }
 
         ObstacleType.PowerLine -> {
-            // Draw wooden utility poles on upper/lower sides
-            val poleWidth = 14f * scaleX
+            // Draw 3D wooden utility poles with metallic crossbeams
+            val poleWidth = 16f * scaleX
+            val poleBrush = Brush.linearGradient(
+                colors = listOf(Color(0xFF2C1A11), Color(0xFF5D4037), Color(0xFF8D6E63), Color(0xFF3E2723)),
+                start = Offset((obs.x - 8f) * scaleX, 0f),
+                end = Offset((obs.x + 8f) * scaleX, 0f)
+            )
+
             drawRect(
-                color = Color(0xFF3E2723), // Dark wood brown
-                topLeft = Offset((obs.x - 7f) * scaleX, 0f),
+                brush = poleBrush,
+                topLeft = Offset((obs.x - 8f) * scaleX, 0f),
                 size = Size(poleWidth, gapTop)
             )
             drawRect(
-                color = Color(0xFF3E2723),
-                topLeft = Offset((obs.x - 7f) * scaleX, gapBottom),
+                brush = poleBrush,
+                topLeft = Offset((obs.x - 8f) * scaleX, gapBottom),
                 size = Size(poleWidth, size.height - gapBottom)
             )
 
-            // Draw crossbeams
-            val beamHeight = 10f * scaleY
-            val beamWidth = 44f * scaleX
-            drawRect(
-                color = Color(0xFF5D4037),
-                topLeft = Offset((obs.x - 22f) * scaleX, gapTop - beamHeight - 10f * scaleY),
-                size = Size(beamWidth, beamHeight)
-            )
-            drawRect(
-                color = Color(0xFF5D4037),
-                topLeft = Offset((obs.x - 22f) * scaleX, gapBottom + 10f * scaleY),
-                size = Size(beamWidth, beamHeight)
+            // Metallic Crossbeams
+            val beamHeight = 12f * scaleY
+            val beamWidth = 48f * scaleX
+            val beamBrush = Brush.verticalGradient(
+                colors = listOf(Color(0xFF8D6E63), Color(0xFF4E342E))
             )
 
-            // Draw spark particles at the electrical wire endpoints
-            val showSpark = (gameTicks % 15 < 6)
+            drawRoundRect(
+                brush = beamBrush,
+                topLeft = Offset((obs.x - 24f) * scaleX, gapTop - beamHeight - 12f * scaleY),
+                size = Size(beamWidth, beamHeight),
+                cornerRadius = CornerRadius(3f * scaleX)
+            )
+            drawRoundRect(
+                brush = beamBrush,
+                topLeft = Offset((obs.x - 24f) * scaleX, gapBottom + 12f * scaleY),
+                size = Size(beamWidth, beamHeight),
+                cornerRadius = CornerRadius(3f * scaleX)
+            )
+
+            // Ceramic insulators with electric spark animations
+            drawCircle(color = Color(0xFF80DEEA), radius = 5f * scaleX, center = Offset((obs.x - 18f) * scaleX, gapTop - 18f * scaleY))
+            drawCircle(color = Color(0xFF80DEEA), radius = 5f * scaleX, center = Offset((obs.x + 18f) * scaleX, gapTop - 18f * scaleY))
+            drawCircle(color = Color(0xFF80DEEA), radius = 5f * scaleX, center = Offset((obs.x - 18f) * scaleX, gapBottom + 18f * scaleY))
+            drawCircle(color = Color(0xFF80DEEA), radius = 5f * scaleX, center = Offset((obs.x + 18f) * scaleX, gapBottom + 18f * scaleY))
+
+            val showSpark = (gameTicks % 12 < 6)
             if (showSpark) {
-                drawCircle(
-                    color = NightSecondary,
-                    radius = 6f * scaleX,
-                    center = Offset(obs.x * scaleX, gapTop - 5f * scaleY)
-                )
-                drawCircle(
-                    color = NightSecondary,
-                    radius = 6f * scaleX,
-                    center = Offset(obs.x * scaleX, gapBottom + 5f * scaleY)
-                )
+                drawCircle(color = Color(0xFFFFE082), radius = 7f * scaleX, center = Offset(obs.x * scaleX, gapTop - 6f * scaleY))
+                drawCircle(color = Color(0xFFFFE082), radius = 7f * scaleX, center = Offset(obs.x * scaleX, gapBottom + 6f * scaleY))
             }
         }
 
         ObstacleType.CastleTower -> {
-            // Stone towers
+            // Fantasy 3D Stone Towers
+            val capExtra = 6f * scaleX
+            val battleHeight = 22f * scaleY
+
+            val stoneBrush = Brush.linearGradient(
+                colors = listOf(Color(0xFF28183D), Color(0xFF4A2C6D), Color(0xFF6A4093), Color(0xFF311B4E)),
+                start = Offset(left, 0f),
+                end = Offset(right, 0f)
+            )
+
             // TOP TOWER
-            drawRect(
-                color = Color(0xFF5A5C66), // Medium grey stone
-                topLeft = Offset(left, 0f),
-                size = Size(width, gapTop)
-            )
-            // Battlement crown on bottom
-            val battleHeight = 18f * scaleY
-            val castleExtra = 4f * scaleX
-            drawRect(
-                color = Color(0xFF45464F), // Lighter stone accent
-                topLeft = Offset(left - castleExtra, gapTop - battleHeight),
-                size = Size(width + castleExtra * 2f, battleHeight)
-            )
-            // Cutouts for battlements
-            val cutoutW = (width + castleExtra * 2f) / 3f
-            drawRect(
-                color = NightBackground,
-                topLeft = Offset(left - castleExtra + cutoutW * 0.7f, gapTop - battleHeight * 0.4f),
-                size = Size(cutoutW * 0.6f, battleHeight * 0.42f)
+            drawRect(brush = stoneBrush, topLeft = Offset(left, 0f), size = Size(width, gapTop))
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00))),
+                topLeft = Offset(left - capExtra, gapTop - battleHeight),
+                size = Size(width + capExtra * 2f, battleHeight),
+                cornerRadius = CornerRadius(4f * scaleX)
             )
 
             // BOTTOM TOWER
-            drawRect(
-                color = Color(0xFF5A5C66),
-                topLeft = Offset(left, gapBottom),
-                size = Size(width, size.height - gapBottom)
-            )
-            // Battlement crown on top
-            drawRect(
-                color = Color(0xFF45464F),
-                topLeft = Offset(left - castleExtra, gapBottom),
-                size = Size(width + castleExtra * 2f, battleHeight)
-            )
-            drawRect(
-                color = NightBackground,
-                topLeft = Offset(left - castleExtra + cutoutW * 0.7f, gapBottom),
-                size = Size(cutoutW * 0.6f, battleHeight * 0.4f)
+            drawRect(brush = stoneBrush, topLeft = Offset(left, gapBottom), size = Size(width, size.height - gapBottom))
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00))),
+                topLeft = Offset(left - capExtra, gapBottom),
+                size = Size(width + capExtra * 2f, battleHeight),
+                cornerRadius = CornerRadius(4f * scaleX)
             )
 
-            // Draw a tiny cute waving flag on top tower
-            val flagPhase = sin(gameTicks * 0.2f) * 6f
+            // Waving Red/Gold Flag
+            val flagPhase = sin(gameTicks * 0.22f) * 7f
             val poleX = obs.x * scaleX
             val poleY = gapBottom + 35f * scaleY
-            
-            // Flag pole
+
             drawLine(
-                color = Color.LightGray,
+                color = Color.White,
                 start = Offset(poleX, poleY),
-                end = Offset(poleX + 12f * scaleX, poleY),
-                strokeWidth = 2f * scaleX
+                end = Offset(poleX + 14f * scaleX, poleY),
+                strokeWidth = 2.5f * scaleX
             )
-            // Flag banner
             val flagPath = Path().apply {
-                moveTo(poleX + 12f * scaleX, poleY - 6f * scaleY)
-                lineTo(poleX + 30f * scaleX + flagPhase * scaleX, poleY)
-                lineTo(poleX + 12f * scaleX, poleY + 6f * scaleY)
+                moveTo(poleX + 14f * scaleX, poleY - 7f * scaleY)
+                lineTo(poleX + 34f * scaleX + flagPhase * scaleX, poleY)
+                lineTo(poleX + 14f * scaleX, poleY + 7f * scaleY)
                 close()
             }
-            drawPath(flagPath, color = Color.Red)
+            drawPath(flagPath, color = Color(0xFFFF1744))
         }
 
         ObstacleType.TreeBranch -> {
-            // Gnarled, crooked branches with bark texture
-            // TOP BRANCH
+            // Gnarled cartoon tree trunks
+            val trunkBrush = Brush.linearGradient(
+                colors = listOf(Color(0xFF211003), Color(0xFF4E2A0C), Color(0xFF7A4519), Color(0xFF361C07)),
+                start = Offset(left, 0f),
+                end = Offset(right, 0f)
+            )
+
             val topPath = Path().apply {
                 moveTo(left + width * 0.4f, 0f)
-                quadraticTo(
-                    obs.x * scaleX, gapTop * 0.5f,
-                    obs.x * scaleX, gapTop
-                )
-                lineTo((obs.x - 10f) * scaleX, gapTop)
-                quadraticTo(
-                    (obs.x - 20f) * scaleX, gapTop * 0.5f,
-                    left, 0f
-                )
+                quadraticTo(obs.x * scaleX, gapTop * 0.5f, obs.x * scaleX, gapTop)
+                lineTo((obs.x - 12f) * scaleX, gapTop)
+                quadraticTo((obs.x - 22f) * scaleX, gapTop * 0.5f, left, 0f)
                 close()
             }
-            drawPath(topPath, color = Color(0xFF381C00))
+            drawPath(topPath, brush = trunkBrush)
 
-            // BOTTOM BRANCH
             val bottomPath = Path().apply {
                 moveTo(obs.x * scaleX, gapBottom)
-                quadraticTo(
-                    (obs.x + 10f) * scaleX, gapBottom + (size.height - gapBottom) * 0.5f,
-                    right, size.height
-                )
+                quadraticTo((obs.x + 12f) * scaleX, gapBottom + (size.height - gapBottom) * 0.5f, right, size.height)
                 lineTo(left, size.height)
-                quadraticTo(
-                    (obs.x - 10f) * scaleX, gapBottom + (size.height - gapBottom) * 0.5f,
-                    (obs.x - 15f) * scaleX, gapBottom
-                )
+                quadraticTo((obs.x - 12f) * scaleX, gapBottom + (size.height - gapBottom) * 0.5f, (obs.x - 16f) * scaleX, gapBottom)
                 close()
             }
-            drawPath(bottomPath, color = Color(0xFF381C00))
+            drawPath(bottomPath, brush = trunkBrush)
 
-            // Add cute tiny glowing eyes inside a tree notch!
-            val eyesFlash = (gameTicks % 40 < 32)
-            if (eyesFlash) {
-                val eyeX = (obs.x - 5f) * scaleX
-                val eyeY = gapBottom + 45f * scaleY
-                if (eyeY < size.height - 20f) {
-                    drawCircle(color = NightSecondary, radius = 2.5f * scaleX, center = Offset(eyeX, eyeY))
-                    drawCircle(color = NightSecondary, radius = 2.5f * scaleX, center = Offset(eyeX + 6f * scaleX, eyeY))
-                }
-            }
+            // Leaf bunches
+            drawCircle(color = Color(0xFF66BB6A), radius = 12f * scaleX, center = Offset(obs.x * scaleX, gapTop - 10f * scaleY))
+            drawCircle(color = Color(0xFF66BB6A), radius = 12f * scaleX, center = Offset(obs.x * scaleX, gapBottom + 10f * scaleY))
         }
 
         ObstacleType.FlyingObstacle -> {
-            // A hybrid brick wall obstacle carrying animated floating items
-            drawRect(
-                color = Color(0xFF1B0024),
-                topLeft = Offset(left, 0f),
-                size = Size(width, gapTop)
-            )
-            drawRect(
-                color = Color(0xFF1B0024),
-                topLeft = Offset(left, gapBottom),
-                size = Size(width, size.height - gapBottom)
+            // High-tech Cyber Pillars
+            val cyberBrush = Brush.linearGradient(
+                colors = listOf(Color(0xFF10002B), Color(0xFF3A0CA3), Color(0xFF7209B7), Color(0xFF180138)),
+                start = Offset(left, 0f),
+                end = Offset(right, 0f)
             )
 
-            // Animated bat/drone warning light
-            val lightColor = if (gameTicks % 20 < 10) Color.Red else Color.Transparent
-            drawCircle(
-                color = lightColor,
-                radius = 5f * scaleX,
-                center = Offset(obs.x * scaleX, gapTop - 8f * scaleY)
-            )
-            drawCircle(
-                color = lightColor,
-                radius = 5f * scaleX,
-                center = Offset(obs.x * scaleX, gapBottom + 8f * scaleY)
-            )
+            drawRect(brush = cyberBrush, topLeft = Offset(left, 0f), size = Size(width, gapTop))
+            drawRect(brush = cyberBrush, topLeft = Offset(left, gapBottom), size = Size(width, size.height - gapBottom))
+
+            val lightColor = if (gameTicks % 16 < 8) Color(0xFFFF0055) else Color(0xFF00F5D4)
+            drawCircle(color = lightColor, radius = 6f * scaleX, center = Offset(obs.x * scaleX, gapTop - 10f * scaleY))
+            drawCircle(color = lightColor, radius = 6f * scaleX, center = Offset(obs.x * scaleX, gapBottom + 10f * scaleY))
         }
     }
 }
@@ -1292,100 +1660,284 @@ private fun DrawScope.drawPlayer(
 
     // Rotate player based on velocity angle
     rotate(degrees = playerAngle, pivot = Offset(px, py)) {
-        
-        // 1. Tail Feathers (triangles pointing backwards/left)
-        val tailPath = Path().apply {
-            moveTo(px - r * 0.9f, py)
-            lineTo(px - r * 1.6f, py - r * 0.4f)
-            lineTo(px - r * 1.5f, py)
-            lineTo(px - r * 1.6f, py + r * 0.4f)
-            close()
-        }
-        drawPath(tailPath, color = FeatherBlack)
-        drawPath(tailPath, color = FeatherHighlight.copy(alpha = 0.3f), style = Stroke(width = 2f * scaleX))
 
-        // 2. Crow Main Body (beautiful deep black-purple)
+        // 0. Outer Soft Pastel Aura
         drawCircle(
-            color = FeatherBlack,
-            radius = r,
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFB388FF).copy(alpha = 0.22f), // Soft lavender glow
+                    Color(0xFF80DEEA).copy(alpha = 0.15f), // Soft cyan glow
+                    Color.Transparent
+                ),
+                center = Offset(px, py),
+                radius = r * 1.85f
+            ),
+            radius = r * 1.85f,
             center = Offset(px, py)
         )
-        // Cute purple highlight glow inside the body
-        drawCircle(
-            color = FeatherHighlight,
-            radius = r * 0.9f,
-            center = Offset(px, py),
-            style = Stroke(width = 3f * scaleX)
-        )
 
-        // 3. Golden Beak (cute forward triangle)
-        val beakPath = Path().apply {
-            moveTo(px + r * 0.8f, py - r * 0.3f)
-            lineTo(px + r * 1.7f, py)
-            lineTo(px + r * 0.8f, py + r * 0.3f)
+        // 1. Chubby Rounded Tail Feathers
+        val tailSway = sin(gameTicks * 0.12f) * 3f
+        for (i in -1..1) {
+            val spreadAngle = i * 14f + tailSway
+            rotate(degrees = spreadAngle, pivot = Offset(px - r * 0.7f, py + r * 0.1f)) {
+                val tailPath = Path().apply {
+                    moveTo(px - r * 0.6f, py + r * 0.1f)
+                    quadraticTo(
+                        px - r * 1.4f, py - r * 0.2f,
+                        px - r * 1.6f, py + r * 0.1f
+                    )
+                    quadraticTo(
+                        px - r * 1.4f, py + r * 0.4f,
+                        px - r * 0.6f, py + r * 0.1f
+                    )
+                    close()
+                }
+                drawPath(
+                    tailPath,
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color(0xFF281E45), Color(0xFF3D2E60)),
+                        start = Offset(px - r * 0.6f, py),
+                        end = Offset(px - r * 1.6f, py)
+                    )
+                )
+                drawPath(
+                    tailPath,
+                    color = Color(0xFFB388FF).copy(alpha = 0.5f),
+                    style = Stroke(width = 1.6f * scaleX)
+                )
+            }
+        }
+
+        // 2. Cute Rounded Orange Feet
+        val feetColor = Color(0xFFFF9800)
+        drawCircle(color = feetColor, radius = r * 0.14f, center = Offset(px - r * 0.18f, py + r * 0.95f))
+        drawCircle(color = feetColor, radius = r * 0.14f, center = Offset(px + r * 0.18f, py + r * 0.95f))
+
+        // 3. Ultra-Cute Chubby Round Body (Soft midnight-indigo baby bird silhouette matching icon)
+        val bodyPath = Path().apply {
+            moveTo(px + r * 0.2f, py - r * 0.92f) // Head top
+            quadraticTo(
+                px + r * 0.85f, py - r * 0.4f, // Forehead / nose bridge
+                px + r * 0.82f, py - r * 0.15f
+            )
+            quadraticTo(
+                px + r * 1.05f, py + r * 0.45f, // Cute chubby tummy bump!
+                px + r * 0.35f, py + r * 0.96f
+            )
+            quadraticTo(
+                px - r * 0.7f, py + r * 1.02f, // Bottom rounded curve
+                px - r * 0.92f, py + r * 0.35f
+            )
+            quadraticTo(
+                px - r * 0.88f, py - r * 0.65f, // Round back
+                px + r * 0.2f, py - r * 0.92f
+            )
             close()
         }
-        drawPath(beakPath, color = NightBeakGold)
 
-        // 4. Large Expressive Eyes (White outer, black pupil, twinkling white dot)
-        val eyeX = px + r * 0.4f
-        val eyeY = py - r * 0.3f
-        val eyeRadius = r * 0.35f
-        
-        // Eye blinking logic (blinks occasionally)
-        val isBlinking = (gameTicks % 120 > 112)
-        if (isBlinking) {
-            // Closed eye line
-            drawLine(
-                color = NightOnBackground,
-                start = Offset(eyeX - eyeRadius, eyeY),
-                end = Offset(eyeX + eyeRadius, eyeY),
-                strokeWidth = 2f * scaleX
+        // Soft gradient fill (3D plush toy aesthetic)
+        drawPath(
+            bodyPath,
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFF4C3973), // Soft glowing lavender-indigo center
+                    Color(0xFF2D214F), // Mid indigo
+                    Color(0xFF191133)  // Deep soft dark indigo
+                ),
+                center = Offset(px + r * 0.25f, py - r * 0.25f),
+                radius = r * 1.4f
             )
-        } else {
-            // White eyeball
-            drawCircle(
-                color = Color.White,
-                radius = eyeRadius,
-                center = Offset(eyeX, eyeY)
+        )
+
+        // Soft pastel outline stroke
+        drawPath(
+            bodyPath,
+            color = Color(0xFFB388FF).copy(alpha = 0.65f),
+            style = Stroke(width = 2.2f * scaleX)
+        )
+
+        // 4. Soft Rounded Head Fluff / Feather Puffs
+        val headPuffs = Path().apply {
+            moveTo(px - r * 0.05f, py - r * 0.9f)
+            quadraticTo(px - r * 0.2f, py - r * 1.22f, px, py - r * 0.98f)
+            quadraticTo(px - r * 0.35f, py - r * 1.15f, px - r * 0.2f, py - r * 0.82f)
+            close()
+        }
+        drawPath(
+            headPuffs,
+            color = Color(0xFF3C2A62)
+        )
+        drawPath(
+            headPuffs,
+            color = Color(0xFFB388FF).copy(alpha = 0.7f),
+            style = Stroke(width = 1.5f * scaleX)
+        )
+
+        // 5. Short, Smiling, Cute Golden Beak
+        val isBeakFlap = (playerAngle < -5f) || (gameTicks % 28 < 5)
+        val smileCurve = if (isBeakFlap) r * 0.08f else 0f
+
+        val beakPath = Path().apply {
+            moveTo(px + r * 0.72f, py - r * 0.22f)
+            quadraticTo(
+                px + r * 1.15f, py - r * 0.28f,
+                px + r * 1.42f, py - r * 0.02f // Rounded tip
             )
-            // Black pupil
-            drawCircle(
-                color = Color.Black,
-                radius = eyeRadius * 0.5f,
-                center = Offset(eyeX + eyeRadius * 0.15f, eyeY)
+            quadraticTo(
+                px + r * 1.1f, py + r * 0.18f + smileCurve, // Cute happy smile curve!
+                px + r * 0.72f, py + r * 0.15f
             )
-            // Tiny highlight shine
-            drawCircle(
-                color = Color.White,
-                radius = eyeRadius * 0.15f,
-                center = Offset(eyeX + eyeRadius * 0.3f, eyeY - eyeRadius * 0.2f)
-            )
+            close()
         }
 
-        // 5. Wings (rotating flaps)
-        // Draw the main wing layered on top of body
+        val beakGradient = Brush.verticalGradient(
+            colors = listOf(Color(0xFFFFE082), Color(0xFFFFB300), Color(0xFFFF8F00)),
+            startY = py - r * 0.28f,
+            endY = py + r * 0.18f
+        )
+        drawPath(beakPath, brush = beakGradient)
+
+        // Beak smile line accent
+        val smileLine = Path().apply {
+            moveTo(px + r * 0.72f, py - r * 0.02f)
+            quadraticTo(
+                px + r * 1.15f, py - r * 0.02f,
+                px + r * 1.38f, py - r * 0.02f
+            )
+        }
+        drawPath(smileLine, color = Color(0xFFE65100).copy(alpha = 0.8f), style = Stroke(width = 1.4f * scaleX, cap = StrokeCap.Round))
+
+        // Beak top white sheen highlight
+        drawLine(
+            color = Color.White.copy(alpha = 0.85f),
+            start = Offset(px + r * 0.8f, py - r * 0.2f),
+            end = Offset(px + r * 1.25f, py - r * 0.08f),
+            strokeWidth = 1.8f * scaleX,
+            cap = StrokeCap.Round
+        )
+
+        // 6. Cute Rosy Pink Blush Cheek
+        val blushX = px + r * 0.38f
+        val blushY = py + r * 0.12f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0xFFFF5277).copy(alpha = 0.65f), Color.Transparent),
+                center = Offset(blushX, blushY),
+                radius = r * 0.28f
+            ),
+            radius = r * 0.28f,
+            center = Offset(blushX, blushY)
+        )
+
+        // 7. Giant, Expressive, Adorable Anime Eye
+        val eyeX = px + r * 0.38f
+        val eyeY = py - r * 0.30f
+        val eyeRadius = r * 0.38f
+
+        val isBlinking = (gameTicks % 110 > 103)
+        if (isBlinking) {
+            val blinkPath = Path().apply {
+                moveTo(eyeX - eyeRadius * 0.75f, eyeY)
+                quadraticTo(eyeX, eyeY + eyeRadius * 0.45f, eyeX + eyeRadius * 0.75f, eyeY)
+            }
+            drawPath(blinkPath, color = Color.White, style = Stroke(width = 3.2f * scaleX, cap = StrokeCap.Round))
+        } else {
+            // White eye background
+            drawCircle(color = Color.White, radius = eyeRadius, center = Offset(eyeX, eyeY))
+
+            // Deep sparkling dark purple / indigo iris
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF5E35B1), Color(0xFF311B92), Color(0xFF10002B)),
+                    center = Offset(eyeX + eyeRadius * 0.1f, eyeY - eyeRadius * 0.05f),
+                    radius = eyeRadius * 0.82f
+                ),
+                radius = eyeRadius * 0.82f,
+                center = Offset(eyeX + eyeRadius * 0.08f, eyeY)
+            )
+
+            // Large glossy main sparkle catchlight (top right)
+            drawCircle(
+                color = Color.White,
+                radius = eyeRadius * 0.34f,
+                center = Offset(eyeX + eyeRadius * 0.28f, eyeY - eyeRadius * 0.26f)
+            )
+
+            // Secondary cute sparkle reflection (bottom left)
+            drawCircle(
+                color = Color.White.copy(alpha = 0.9f),
+                radius = eyeRadius * 0.16f,
+                center = Offset(eyeX - eyeRadius * 0.15f, eyeY + eyeRadius * 0.28f)
+            )
+
+            // Tiny extra star sparkle dot
+            drawCircle(
+                color = Color.White.copy(alpha = 0.8f),
+                radius = eyeRadius * 0.08f,
+                center = Offset(eyeX + eyeRadius * 0.45f, eyeY + eyeRadius * 0.12f)
+            )
+
+            // Sweet eyelash arch
+            val lashPath = Path().apply {
+                moveTo(eyeX - eyeRadius * 0.8f, eyeY - eyeRadius * 0.4f)
+                quadraticTo(
+                    eyeX, eyeY - eyeRadius * 1.1f,
+                    eyeX + eyeRadius * 0.85f, eyeY - eyeRadius * 0.35f
+                )
+            }
+            drawPath(lashPath, color = Color(0xFF1A1133), style = Stroke(width = 2.8f * scaleX, cap = StrokeCap.Round))
+        }
+
+        // 8. Chubby Soft Flapping Wing
+        val wingPivotX = px - r * 0.08f
+        val wingPivotY = py + r * 0.15f
         val wingWidth = r * 1.2f
-        val wingHeight = r * 0.7f
-        val wingPivotX = px - r * 0.1f
-        val wingPivotY = py + r * 0.1f
-        
+        val wingHeight = r * 0.75f
+
         rotate(degrees = wingAngle, pivot = Offset(wingPivotX, wingPivotY)) {
-            // Wing Path
             val wingPath = Path().apply {
                 moveTo(wingPivotX, wingPivotY)
-                lineTo(wingPivotX - wingWidth, wingPivotY - wingHeight)
                 quadraticTo(
-                    wingPivotX - wingWidth * 0.5f, wingPivotY + wingHeight * 0.5f,
+                    wingPivotX - wingWidth * 0.8f, wingPivotY - wingHeight * 0.9f,
+                    wingPivotX - wingWidth * 1.15f, wingPivotY - wingHeight * 0.3f
+                )
+                quadraticTo(
+                    wingPivotX - wingWidth * 0.7f, wingPivotY + wingHeight * 0.5f,
                     wingPivotX, wingPivotY
                 )
                 close()
             }
-            drawPath(wingPath, color = FeatherBlack)
-            drawPath(wingPath, color = FeatherHighlight, style = Stroke(width = 1.5f * scaleX))
+            drawPath(
+                wingPath,
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF533F7D), Color(0xFF2D204E)),
+                    center = Offset(wingPivotX - wingWidth * 0.5f, wingPivotY),
+                    radius = wingWidth
+                )
+            )
+            drawPath(
+                wingPath,
+                color = Color(0xFFB388FF).copy(alpha = 0.85f),
+                style = Stroke(width = 2f * scaleX)
+            )
+
+            // Inner wing feather accent
+            val innerWing = Path().apply {
+                moveTo(wingPivotX, wingPivotY)
+                quadraticTo(
+                    wingPivotX - wingWidth * 0.6f, wingPivotY - wingHeight * 0.5f,
+                    wingPivotX - wingWidth * 0.82f, wingPivotY - wingHeight * 0.1f
+                )
+            }
+            drawPath(
+                innerWing,
+                color = Color(0xFF80DEEA).copy(alpha = 0.7f),
+                style = Stroke(width = 1.6f * scaleX, cap = StrokeCap.Round)
+            )
         }
 
-        // 6. Draw SELECTED ACCESSORY (Detective Hat, Red Scarf, Wizard Hat, Golden Crown, Pilot Goggles)
+        // 9. Draw Accessories
         drawAccessory(selectedAccessory, px, py, r, scaleX, scaleY, gameTicks)
     }
 }
