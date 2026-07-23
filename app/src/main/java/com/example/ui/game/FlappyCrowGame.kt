@@ -839,111 +839,186 @@ private fun DrawScope.drawNightSky(
     size: Size,
     gameTicks: Long
 ) {
-    // 1. Draw radial glowing gradient for deep cosmic atmosphere
+    // 1. Draw smooth vertical pastel night sky gradient matching the poster
     drawRect(
-        brush = Brush.radialGradient(
-            colors = listOf(Color(0xFF1B0B3C), Color(0xFF040209)),
-            center = Offset(size.width * 0.5f, size.height * 0.3f),
-            radius = size.height * 0.8f
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF3D2766), // Soft lavender purple top sky
+                Color(0xFF261947), // Deep indigo mid sky
+                Color(0xFF140C2C)  // Midnight violet horizon
+            )
         ),
         topLeft = Offset.Zero,
         size = size
     )
 
-    // 2. Draw Twinkling Stars
-    stars.toList().forEach { star ->
-        drawCircle(
-            color = SparkleWhite.copy(alpha = star.brightness),
-            radius = star.size * scaleX,
-            center = Offset(star.x * scaleX, star.y * scaleY)
-        )
+    // 2. Draw Twinkling Stars & Diamond Sparkle Stars
+    stars.toList().forEachIndexed { index, star ->
+        val starX = star.x * scaleX
+        val starY = star.y * scaleY
+        val starRadius = star.size * scaleX
+
+        if (index % 4 == 0) {
+            // Diamond 4-point sparkle star
+            val sparkleSize = starRadius * 2.2f * star.brightness
+            val starPath = Path().apply {
+                moveTo(starX, starY - sparkleSize)
+                quadraticTo(starX, starY, starX + sparkleSize, starY)
+                quadraticTo(starX, starY, starX, starY + sparkleSize)
+                quadraticTo(starX, starY, starX - sparkleSize, starY)
+                quadraticTo(starX, starY, starX, starY - sparkleSize)
+                close()
+            }
+            drawPath(starPath, color = Color(0xFFE1D5FF).copy(alpha = star.brightness.coerceAtMost(0.9f)))
+        } else {
+            // Soft round star
+            drawCircle(
+                color = Color.White.copy(alpha = star.brightness),
+                radius = starRadius,
+                center = Offset(starX, starY)
+            )
+        }
     }
 
-    // 3. Draw Huge Glowing Moon
-    val moonCenterX = 280f * scaleX
-    val moonCenterY = 120f * scaleY
-    val moonRadius = 45f * scaleX
+    // 3. Draw Huge Friendly Moon with Soft Layered Glowing Halos
+    val moonCenterX = size.width * 0.78f
+    val moonCenterY = size.height * 0.16f
+    val moonRadius = 48f * scaleX
 
-    // Outer moon glow
+    // Concentric soft golden glow rings
     drawCircle(
-        color = NightTertiary.copy(alpha = 0.15f),
-        radius = moonRadius + 15f * scaleX,
+        color = Color(0xFFFFF59D).copy(alpha = 0.08f),
+        radius = moonRadius * 2.1f,
         center = Offset(moonCenterX, moonCenterY)
     )
-    // Core Moon
     drawCircle(
-        color = Color(0xFFFFF9D8),
+        color = Color(0xFFFFF59D).copy(alpha = 0.15f),
+        radius = moonRadius * 1.5f,
+        center = Offset(moonCenterX, moonCenterY)
+    )
+    drawCircle(
+        color = Color(0xFFFFF59D).copy(alpha = 0.28f),
+        radius = moonRadius * 1.18f,
+        center = Offset(moonCenterX, moonCenterY)
+    )
+
+    // Main Moon Core Disc with soft radial gradient
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color(0xFFFFFDE7), // Luminous cream center
+                Color(0xFFFFF59D), // Soft pastel yellow
+                Color(0xFFFFD54F)  // Warm golden edge
+            ),
+            center = Offset(moonCenterX - moonRadius * 0.2f, moonCenterY - moonRadius * 0.2f),
+            radius = moonRadius * 1.2f
+        ),
         radius = moonRadius,
         center = Offset(moonCenterX, moonCenterY)
     )
-    // Subtle crater/shadow detail inside the moon
+
+    // Soft crater details on the moon
     drawCircle(
-        color = Color(0xFFEADB9E).copy(alpha = 0.6f),
-        radius = moonRadius * 0.25f,
-        center = Offset(moonCenterX - moonRadius * 0.3f, moonCenterY - moonRadius * 0.2f)
+        color = Color(0xFFFBC02D).copy(alpha = 0.35f),
+        radius = moonRadius * 0.22f,
+        center = Offset(moonCenterX - moonRadius * 0.32f, moonCenterY - moonRadius * 0.18f)
     )
     drawCircle(
-        color = Color(0xFFEADB9E).copy(alpha = 0.6f),
-        radius = moonRadius * 0.15f,
-        center = Offset(moonCenterX + moonRadius * 0.2f, moonCenterY + moonRadius * 0.3f)
+        color = Color(0xFFFBC02D).copy(alpha = 0.3f),
+        radius = moonRadius * 0.16f,
+        center = Offset(moonCenterX + moonRadius * 0.25f, moonCenterY + moonRadius * 0.32f)
     )
 
-    // 4. Draw Parallax Background Silhouette of Magical City
+    // 4. Draw Drifting Puffy Clouds
+    clouds.toList().forEach { cloud ->
+        val cloudX = cloud.x * scaleX
+        val cloudY = cloud.y * scaleY
+        val cloudR = 28f * scaleX * cloud.scale
+
+        // Cloud body gradient
+        val cloudBrush = Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF7E57C2).copy(alpha = 0.35f),
+                Color(0xFF38235C).copy(alpha = 0.45f)
+            ),
+            startY = cloudY - cloudR,
+            endY = cloudY + cloudR
+        )
+
+        drawCircle(
+            brush = cloudBrush,
+            radius = cloudR,
+            center = Offset(cloudX, cloudY)
+        )
+        drawCircle(
+            brush = cloudBrush,
+            radius = cloudR * 0.78f,
+            center = Offset(cloudX - cloudR * 0.62f, cloudY + cloudR * 0.12f)
+        )
+        drawCircle(
+            brush = cloudBrush,
+            radius = cloudR * 0.78f,
+            center = Offset(cloudX + cloudR * 0.62f, cloudY + cloudR * 0.12f)
+        )
+    }
+
+    // 5. Parallax City Silhouette with Warm Glowing Windows
     val buildingWidth = size.width / 10f
     for (i in 0..10) {
         val buildingHeight = (buildings.getOrNull(i) ?: 100f) * scaleY
         val left = i * buildingWidth
         val top = size.height - buildingHeight
-        
+
         drawRect(
-            color = Color(0xFF140D2C).copy(alpha = 0.65f),
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF281C4A).copy(alpha = 0.85f),
+                    Color(0xFF160E2E).copy(alpha = 0.95f)
+                ),
+                startY = top,
+                endY = size.height
+            ),
             topLeft = Offset(left, top),
             size = Size(buildingWidth + 2f, buildingHeight)
         )
 
-        // Draw small warm yellow windows on some background buildings
+        // Building rooftop stroke accent
+        drawLine(
+            color = Color(0xFF80DEEA).copy(alpha = 0.35f),
+            start = Offset(left, top),
+            end = Offset(left + buildingWidth + 2f, top),
+            strokeWidth = 2f * scaleX
+        )
+
+        // Cozy glowing warm orange/yellow windows
         if (i % 2 == 0) {
-            val winSize = 4f * scaleX
-            val winX = left + buildingWidth * 0.4f
-            val winY = top + buildingHeight * 0.3f
-            drawRect(
-                color = NightAccentOrange.copy(alpha = 0.7f),
-                topLeft = Offset(winX, winY),
-                size = Size(winSize, winSize * 1.5f)
+            val winSize = 5f * scaleX
+            val winX = left + buildingWidth * 0.38f
+            val winY = top + buildingHeight * 0.28f
+
+            drawCircle(
+                color = Color(0xFFFFB300).copy(alpha = 0.3f),
+                radius = winSize * 2.2f,
+                center = Offset(winX + winSize / 2f, winY + winSize)
             )
-            drawRect(
-                color = NightAccentOrange.copy(alpha = 0.7f),
-                topLeft = Offset(winX + 12f * scaleX, winY + 20f * scaleY),
-                size = Size(winSize, winSize * 1.5f)
+            drawRoundRect(
+                color = Color(0xFFFFD54F),
+                topLeft = Offset(winX, winY),
+                size = Size(winSize, winSize * 1.6f),
+                cornerRadius = CornerRadius(2f * scaleX)
+            )
+
+            drawRoundRect(
+                color = Color(0xFFFFD54F),
+                topLeft = Offset(winX + 13f * scaleX, winY + 18f * scaleY),
+                size = Size(winSize, winSize * 1.6f),
+                cornerRadius = CornerRadius(2f * scaleX)
             )
         }
     }
-
-    // 5. Draw drifting puffy clouds
-    clouds.toList().forEach { cloud ->
-        val cloudX = cloud.x * scaleX
-        val cloudY = cloud.y * scaleY
-        val cloudR = 25f * scaleX * cloud.scale
-
-        drawCircle(
-            color = Color(0xFF4C3B78).copy(alpha = 0.3f),
-            radius = cloudR,
-            center = Offset(cloudX, cloudY)
-        )
-        drawCircle(
-            color = Color(0xFF4C3B78).copy(alpha = 0.3f),
-            radius = cloudR * 0.8f,
-            center = Offset(cloudX - cloudR * 0.6f, cloudY + cloudR * 0.1f)
-        )
-        drawCircle(
-            color = Color(0xFF4C3B78).copy(alpha = 0.3f),
-            radius = cloudR * 0.8f,
-            center = Offset(cloudX + cloudR * 0.6f, cloudY + cloudR * 0.1f)
-        )
-    }
 }
 
-// Draw the customized obstacles (Chimney, PowerLine, CastleTower, TreeBranch, FlyingObstacle)
+// Draw the customized obstacles (3D Vibrant Cartoon Pipes/Pillars matching poster aesthetic)
 private fun DrawScope.drawObstacle(
     obs: Obstacle,
     scaleX: Float,
@@ -959,231 +1034,276 @@ private fun DrawScope.drawObstacle(
 
     when (obs.type) {
         ObstacleType.Chimney -> {
-            // --- TOP CHIMNEY ---
-            // Draw Main Brick Body
+            // --- 3D VIBRANT CARTOON PILLARS (Pipes matching poster) ---
+            val capExtra = 8f * scaleX
+            val capHeight = 22f * scaleY
+
+            // Pillar 3D Body Gradient (Dark shadow -> Rich purple/indigo -> Bright sheen -> Dark shadow)
+            val pillarBrush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF221542), // Dark left shadow
+                    Color(0xFF5E35B1), // Vibrant indigo-purple mid
+                    Color(0xFF8E62D0), // Bright highlight stripe
+                    Color(0xFF4527A0), // Deep purple right
+                    Color(0xFF190F30)  // Dark right shadow edge
+                ),
+                start = Offset(left, 0f),
+                end = Offset(right, 0f)
+            )
+
+            val capBrush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF2A1B50),
+                    Color(0xFF7E57C2),
+                    Color(0xFFB388FF),
+                    Color(0xFF512DA8),
+                    Color(0xFF1F133B)
+                ),
+                start = Offset(left - capExtra, 0f),
+                end = Offset(right + capExtra, 0f)
+            )
+
+            // --- TOP PILLAR ---
+            // Main body
             drawRect(
-                color = Color(0xFF8B2500), // Brick Red
+                brush = pillarBrush,
                 topLeft = Offset(left, 0f),
                 size = Size(width, gapTop)
             )
-            // Ledge collar at bottom
-            val ledgeHeight = 16f * scaleY
-            val ledgeWidthExtra = 6f * scaleX
-            drawRoundRect(
-                color = Color(0xFFA0360F),
-                topLeft = Offset(left - ledgeWidthExtra, gapTop - ledgeHeight),
-                size = Size(width + ledgeWidthExtra * 2f, ledgeHeight),
-                cornerRadius = CornerRadius(4f * scaleX)
+            // Left gloss sheen line
+            drawLine(
+                color = Color.White.copy(alpha = 0.35f),
+                start = Offset(left + width * 0.28f, 0f),
+                end = Offset(left + width * 0.28f, gapTop - capHeight),
+                strokeWidth = 2.5f * scaleX
             )
-            // Smoke soot border on bottom
-            drawRect(
-                color = Color(0xFF2B211E),
-                topLeft = Offset(left, gapTop - 3f * scaleY),
-                size = Size(width, 3f * scaleY)
+            // Brick grid lines
+            for (yStep in 30..gapTop.toInt() step 32) {
+                drawLine(
+                    color = Color(0xFFB388FF).copy(alpha = 0.25f),
+                    start = Offset(left + 2f * scaleX, yStep * scaleY),
+                    end = Offset(right - 2f * scaleX, yStep * scaleY),
+                    strokeWidth = 1.2f * scaleX
+                )
+            }
+            // 3D Cap Collar
+            drawRoundRect(
+                brush = capBrush,
+                topLeft = Offset(left - capExtra, gapTop - capHeight),
+                size = Size(width + capExtra * 2f, capHeight),
+                cornerRadius = CornerRadius(6f * scaleX)
+            )
+            // Glowing cyan rim trim along gap edge
+            drawRoundRect(
+                color = Color(0xFF80DEEA),
+                topLeft = Offset(left - capExtra, gapTop - 3.5f * scaleY),
+                size = Size(width + capExtra * 2f, 3.5f * scaleY),
+                cornerRadius = CornerRadius(2f * scaleX)
+            )
+            // White highlight stroke on top of cap
+            drawLine(
+                color = Color.White.copy(alpha = 0.6f),
+                start = Offset(left - capExtra + 4f * scaleX, gapTop - capHeight + 2f * scaleY),
+                end = Offset(right + capExtra - 4f * scaleX, gapTop - capHeight + 2f * scaleY),
+                strokeWidth = 2f * scaleX,
+                cap = StrokeCap.Round
             )
 
-            // --- BOTTOM CHIMNEY ---
-            // Draw Main Brick Body
-            val bottomChimneyHeight = size.height - gapBottom
+            // --- BOTTOM PILLAR ---
+            val bottomHeight = size.height - gapBottom
+            // Main body
             drawRect(
-                color = Color(0xFF8B2500),
+                brush = pillarBrush,
                 topLeft = Offset(left, gapBottom),
-                size = Size(width, bottomChimneyHeight)
+                size = Size(width, bottomHeight)
             )
-            // Ledge collar at top
+            // Left gloss sheen line
+            drawLine(
+                color = Color.White.copy(alpha = 0.35f),
+                start = Offset(left + width * 0.28f, gapBottom + capHeight),
+                end = Offset(left + width * 0.28f, size.height),
+                strokeWidth = 2.5f * scaleX
+            )
+            // Brick grid lines
+            for (yStep in gapBottom.toInt() + 32..size.height.toInt() step 32) {
+                drawLine(
+                    color = Color(0xFFB388FF).copy(alpha = 0.25f),
+                    start = Offset(left + 2f * scaleX, yStep.toFloat()),
+                    end = Offset(right - 2f * scaleX, yStep.toFloat()),
+                    strokeWidth = 1.2f * scaleX
+                )
+            }
+            // 3D Cap Collar
             drawRoundRect(
-                color = Color(0xFFA0360F),
-                topLeft = Offset(left - ledgeWidthExtra, gapBottom),
-                size = Size(width + ledgeWidthExtra * 2f, ledgeHeight),
-                cornerRadius = CornerRadius(4f * scaleX)
+                brush = capBrush,
+                topLeft = Offset(left - capExtra, gapBottom),
+                size = Size(width + capExtra * 2f, capHeight),
+                cornerRadius = CornerRadius(6f * scaleX)
             )
-            // Smoke soot border on top
-            drawRect(
-                color = Color(0xFF2B211E),
-                topLeft = Offset(left, gapBottom),
-                size = Size(width, 3f * scaleY)
+            // Glowing cyan rim trim along gap edge
+            drawRoundRect(
+                color = Color(0xFF80DEEA),
+                topLeft = Offset(left - capExtra, gapBottom),
+                size = Size(width + capExtra * 2f, 3.5f * scaleY),
+                cornerRadius = CornerRadius(2f * scaleX)
+            )
+            // White highlight stroke on bottom edge of cap
+            drawLine(
+                color = Color.White.copy(alpha = 0.6f),
+                start = Offset(left - capExtra + 4f * scaleX, gapBottom + capHeight - 2f * scaleY),
+                end = Offset(right + capExtra - 4f * scaleX, gapBottom + capHeight - 2f * scaleY),
+                strokeWidth = 2f * scaleX,
+                cap = StrokeCap.Round
             )
         }
 
         ObstacleType.PowerLine -> {
-            // Draw wooden utility poles on upper/lower sides
-            val poleWidth = 14f * scaleX
+            // Draw 3D wooden utility poles with metallic crossbeams
+            val poleWidth = 16f * scaleX
+            val poleBrush = Brush.linearGradient(
+                colors = listOf(Color(0xFF2C1A11), Color(0xFF5D4037), Color(0xFF8D6E63), Color(0xFF3E2723)),
+                start = Offset((obs.x - 8f) * scaleX, 0f),
+                end = Offset((obs.x + 8f) * scaleX, 0f)
+            )
+
             drawRect(
-                color = Color(0xFF3E2723), // Dark wood brown
-                topLeft = Offset((obs.x - 7f) * scaleX, 0f),
+                brush = poleBrush,
+                topLeft = Offset((obs.x - 8f) * scaleX, 0f),
                 size = Size(poleWidth, gapTop)
             )
             drawRect(
-                color = Color(0xFF3E2723),
-                topLeft = Offset((obs.x - 7f) * scaleX, gapBottom),
+                brush = poleBrush,
+                topLeft = Offset((obs.x - 8f) * scaleX, gapBottom),
                 size = Size(poleWidth, size.height - gapBottom)
             )
 
-            // Draw crossbeams
-            val beamHeight = 10f * scaleY
-            val beamWidth = 44f * scaleX
-            drawRect(
-                color = Color(0xFF5D4037),
-                topLeft = Offset((obs.x - 22f) * scaleX, gapTop - beamHeight - 10f * scaleY),
-                size = Size(beamWidth, beamHeight)
-            )
-            drawRect(
-                color = Color(0xFF5D4037),
-                topLeft = Offset((obs.x - 22f) * scaleX, gapBottom + 10f * scaleY),
-                size = Size(beamWidth, beamHeight)
+            // Metallic Crossbeams
+            val beamHeight = 12f * scaleY
+            val beamWidth = 48f * scaleX
+            val beamBrush = Brush.verticalGradient(
+                colors = listOf(Color(0xFF8D6E63), Color(0xFF4E342E))
             )
 
-            // Draw spark particles at the electrical wire endpoints
-            val showSpark = (gameTicks % 15 < 6)
+            drawRoundRect(
+                brush = beamBrush,
+                topLeft = Offset((obs.x - 24f) * scaleX, gapTop - beamHeight - 12f * scaleY),
+                size = Size(beamWidth, beamHeight),
+                cornerRadius = CornerRadius(3f * scaleX)
+            )
+            drawRoundRect(
+                brush = beamBrush,
+                topLeft = Offset((obs.x - 24f) * scaleX, gapBottom + 12f * scaleY),
+                size = Size(beamWidth, beamHeight),
+                cornerRadius = CornerRadius(3f * scaleX)
+            )
+
+            // Ceramic insulators with electric spark animations
+            drawCircle(color = Color(0xFF80DEEA), radius = 5f * scaleX, center = Offset((obs.x - 18f) * scaleX, gapTop - 18f * scaleY))
+            drawCircle(color = Color(0xFF80DEEA), radius = 5f * scaleX, center = Offset((obs.x + 18f) * scaleX, gapTop - 18f * scaleY))
+            drawCircle(color = Color(0xFF80DEEA), radius = 5f * scaleX, center = Offset((obs.x - 18f) * scaleX, gapBottom + 18f * scaleY))
+            drawCircle(color = Color(0xFF80DEEA), radius = 5f * scaleX, center = Offset((obs.x + 18f) * scaleX, gapBottom + 18f * scaleY))
+
+            val showSpark = (gameTicks % 12 < 6)
             if (showSpark) {
-                drawCircle(
-                    color = NightSecondary,
-                    radius = 6f * scaleX,
-                    center = Offset(obs.x * scaleX, gapTop - 5f * scaleY)
-                )
-                drawCircle(
-                    color = NightSecondary,
-                    radius = 6f * scaleX,
-                    center = Offset(obs.x * scaleX, gapBottom + 5f * scaleY)
-                )
+                drawCircle(color = Color(0xFFFFE082), radius = 7f * scaleX, center = Offset(obs.x * scaleX, gapTop - 6f * scaleY))
+                drawCircle(color = Color(0xFFFFE082), radius = 7f * scaleX, center = Offset(obs.x * scaleX, gapBottom + 6f * scaleY))
             }
         }
 
         ObstacleType.CastleTower -> {
-            // Stone towers
+            // Fantasy 3D Stone Towers
+            val capExtra = 6f * scaleX
+            val battleHeight = 22f * scaleY
+
+            val stoneBrush = Brush.linearGradient(
+                colors = listOf(Color(0xFF28183D), Color(0xFF4A2C6D), Color(0xFF6A4093), Color(0xFF311B4E)),
+                start = Offset(left, 0f),
+                end = Offset(right, 0f)
+            )
+
             // TOP TOWER
-            drawRect(
-                color = Color(0xFF5A5C66), // Medium grey stone
-                topLeft = Offset(left, 0f),
-                size = Size(width, gapTop)
-            )
-            // Battlement crown on bottom
-            val battleHeight = 18f * scaleY
-            val castleExtra = 4f * scaleX
-            drawRect(
-                color = Color(0xFF45464F), // Lighter stone accent
-                topLeft = Offset(left - castleExtra, gapTop - battleHeight),
-                size = Size(width + castleExtra * 2f, battleHeight)
-            )
-            // Cutouts for battlements
-            val cutoutW = (width + castleExtra * 2f) / 3f
-            drawRect(
-                color = NightBackground,
-                topLeft = Offset(left - castleExtra + cutoutW * 0.7f, gapTop - battleHeight * 0.4f),
-                size = Size(cutoutW * 0.6f, battleHeight * 0.42f)
+            drawRect(brush = stoneBrush, topLeft = Offset(left, 0f), size = Size(width, gapTop))
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00))),
+                topLeft = Offset(left - capExtra, gapTop - battleHeight),
+                size = Size(width + capExtra * 2f, battleHeight),
+                cornerRadius = CornerRadius(4f * scaleX)
             )
 
             // BOTTOM TOWER
-            drawRect(
-                color = Color(0xFF5A5C66),
-                topLeft = Offset(left, gapBottom),
-                size = Size(width, size.height - gapBottom)
-            )
-            // Battlement crown on top
-            drawRect(
-                color = Color(0xFF45464F),
-                topLeft = Offset(left - castleExtra, gapBottom),
-                size = Size(width + castleExtra * 2f, battleHeight)
-            )
-            drawRect(
-                color = NightBackground,
-                topLeft = Offset(left - castleExtra + cutoutW * 0.7f, gapBottom),
-                size = Size(cutoutW * 0.6f, battleHeight * 0.4f)
+            drawRect(brush = stoneBrush, topLeft = Offset(left, gapBottom), size = Size(width, size.height - gapBottom))
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00))),
+                topLeft = Offset(left - capExtra, gapBottom),
+                size = Size(width + capExtra * 2f, battleHeight),
+                cornerRadius = CornerRadius(4f * scaleX)
             )
 
-            // Draw a tiny cute waving flag on top tower
-            val flagPhase = sin(gameTicks * 0.2f) * 6f
+            // Waving Red/Gold Flag
+            val flagPhase = sin(gameTicks * 0.22f) * 7f
             val poleX = obs.x * scaleX
             val poleY = gapBottom + 35f * scaleY
-            
-            // Flag pole
+
             drawLine(
-                color = Color.LightGray,
+                color = Color.White,
                 start = Offset(poleX, poleY),
-                end = Offset(poleX + 12f * scaleX, poleY),
-                strokeWidth = 2f * scaleX
+                end = Offset(poleX + 14f * scaleX, poleY),
+                strokeWidth = 2.5f * scaleX
             )
-            // Flag banner
             val flagPath = Path().apply {
-                moveTo(poleX + 12f * scaleX, poleY - 6f * scaleY)
-                lineTo(poleX + 30f * scaleX + flagPhase * scaleX, poleY)
-                lineTo(poleX + 12f * scaleX, poleY + 6f * scaleY)
+                moveTo(poleX + 14f * scaleX, poleY - 7f * scaleY)
+                lineTo(poleX + 34f * scaleX + flagPhase * scaleX, poleY)
+                lineTo(poleX + 14f * scaleX, poleY + 7f * scaleY)
                 close()
             }
-            drawPath(flagPath, color = Color.Red)
+            drawPath(flagPath, color = Color(0xFFFF1744))
         }
 
         ObstacleType.TreeBranch -> {
-            // Gnarled, crooked branches with bark texture
-            // TOP BRANCH
+            // Gnarled cartoon tree trunks
+            val trunkBrush = Brush.linearGradient(
+                colors = listOf(Color(0xFF211003), Color(0xFF4E2A0C), Color(0xFF7A4519), Color(0xFF361C07)),
+                start = Offset(left, 0f),
+                end = Offset(right, 0f)
+            )
+
             val topPath = Path().apply {
                 moveTo(left + width * 0.4f, 0f)
-                quadraticTo(
-                    obs.x * scaleX, gapTop * 0.5f,
-                    obs.x * scaleX, gapTop
-                )
-                lineTo((obs.x - 10f) * scaleX, gapTop)
-                quadraticTo(
-                    (obs.x - 20f) * scaleX, gapTop * 0.5f,
-                    left, 0f
-                )
+                quadraticTo(obs.x * scaleX, gapTop * 0.5f, obs.x * scaleX, gapTop)
+                lineTo((obs.x - 12f) * scaleX, gapTop)
+                quadraticTo((obs.x - 22f) * scaleX, gapTop * 0.5f, left, 0f)
                 close()
             }
-            drawPath(topPath, color = Color(0xFF381C00))
+            drawPath(topPath, brush = trunkBrush)
 
-            // BOTTOM BRANCH
             val bottomPath = Path().apply {
                 moveTo(obs.x * scaleX, gapBottom)
-                quadraticTo(
-                    (obs.x + 10f) * scaleX, gapBottom + (size.height - gapBottom) * 0.5f,
-                    right, size.height
-                )
+                quadraticTo((obs.x + 12f) * scaleX, gapBottom + (size.height - gapBottom) * 0.5f, right, size.height)
                 lineTo(left, size.height)
-                quadraticTo(
-                    (obs.x - 10f) * scaleX, gapBottom + (size.height - gapBottom) * 0.5f,
-                    (obs.x - 15f) * scaleX, gapBottom
-                )
+                quadraticTo((obs.x - 12f) * scaleX, gapBottom + (size.height - gapBottom) * 0.5f, (obs.x - 16f) * scaleX, gapBottom)
                 close()
             }
-            drawPath(bottomPath, color = Color(0xFF381C00))
+            drawPath(bottomPath, brush = trunkBrush)
 
-            // Add cute tiny glowing eyes inside a tree notch!
-            val eyesFlash = (gameTicks % 40 < 32)
-            if (eyesFlash) {
-                val eyeX = (obs.x - 5f) * scaleX
-                val eyeY = gapBottom + 45f * scaleY
-                if (eyeY < size.height - 20f) {
-                    drawCircle(color = NightSecondary, radius = 2.5f * scaleX, center = Offset(eyeX, eyeY))
-                    drawCircle(color = NightSecondary, radius = 2.5f * scaleX, center = Offset(eyeX + 6f * scaleX, eyeY))
-                }
-            }
+            // Leaf bunches
+            drawCircle(color = Color(0xFF66BB6A), radius = 12f * scaleX, center = Offset(obs.x * scaleX, gapTop - 10f * scaleY))
+            drawCircle(color = Color(0xFF66BB6A), radius = 12f * scaleX, center = Offset(obs.x * scaleX, gapBottom + 10f * scaleY))
         }
 
         ObstacleType.FlyingObstacle -> {
-            // A hybrid brick wall obstacle carrying animated floating items
-            drawRect(
-                color = Color(0xFF1B0024),
-                topLeft = Offset(left, 0f),
-                size = Size(width, gapTop)
-            )
-            drawRect(
-                color = Color(0xFF1B0024),
-                topLeft = Offset(left, gapBottom),
-                size = Size(width, size.height - gapBottom)
+            // High-tech Cyber Pillars
+            val cyberBrush = Brush.linearGradient(
+                colors = listOf(Color(0xFF10002B), Color(0xFF3A0CA3), Color(0xFF7209B7), Color(0xFF180138)),
+                start = Offset(left, 0f),
+                end = Offset(right, 0f)
             )
 
-            // Animated bat/drone warning light
-            val lightColor = if (gameTicks % 20 < 10) Color.Red else Color.Transparent
-            drawCircle(
-                color = lightColor,
-                radius = 5f * scaleX,
-                center = Offset(obs.x * scaleX, gapTop - 8f * scaleY)
-            )
-            drawCircle(
-                color = lightColor,
-                radius = 5f * scaleX,
-                center = Offset(obs.x * scaleX, gapBottom + 8f * scaleY)
-            )
+            drawRect(brush = cyberBrush, topLeft = Offset(left, 0f), size = Size(width, gapTop))
+            drawRect(brush = cyberBrush, topLeft = Offset(left, gapBottom), size = Size(width, size.height - gapBottom))
+
+            val lightColor = if (gameTicks % 16 < 8) Color(0xFFFF0055) else Color(0xFF00F5D4)
+            drawCircle(color = lightColor, radius = 6f * scaleX, center = Offset(obs.x * scaleX, gapTop - 10f * scaleY))
+            drawCircle(color = lightColor, radius = 6f * scaleX, center = Offset(obs.x * scaleX, gapBottom + 10f * scaleY))
         }
     }
 }
