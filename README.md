@@ -1,5 +1,24 @@
 # 🐦 FlappyCrow
 
+<p align="center">
+  <img src="app/src/main/res/drawable/ic_crow_logo.jpg" alt="FlappyCrow App Icon" width="160" style="border-radius: 28px; box-shadow: 0 8px 16px rgba(0,0,0,0.3);" />
+</p>
+
+<p align="center">
+  <b>Kid-Friendly, Cute & Aesthetic Native Android Arcade Game</b>
+</p>
+
+<p align="center">
+  <img src="app/src/main/res/drawable/flappy_crow_banner.jpg" alt="FlappyCrow Gameplay Banner" width="100%" style="border-radius: 12px;" />
+</p>
+
+---
+
+### 🎨 Official App Icon & Visual Identity
+The **FlappyCrow** app icon features an adorable, chubby baby crow named **Coco** with big expressive anime eyes, rosy blush cheeks, and a smiling golden beak set against a soft, moonlit purple-blue starry night. Designed specifically to be cheerful, minimal, and soft on the eyes for players of all ages!
+
+---
+
 **FlappyCrow** is a high-fidelity, fully native Android casual arcade game built from the ground up using **Kotlin**, **Jetpack Compose**, and **Material Design 3**. Guide Coco the mischievous crow through a magical moonlit city, dodging tricky chimney pipes, collecting sparkling coins and gems, and unlocking cool accessories along the way!
 
 ---
