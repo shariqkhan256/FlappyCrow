@@ -16,6 +16,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -135,6 +138,7 @@ fun FlappyCrowGame(
     var coinsCollected by remember { mutableStateOf(0) }
     var isPaused by remember { mutableStateOf(false) }
     var isStarted by remember { mutableStateOf(false) }
+    var soundOn by remember(isSoundEnabled) { mutableStateOf(isSoundEnabled) }
 
     // Virtual Game Screen Dimensions (relative mapping)
     val virtualWidth = 360f
@@ -256,7 +260,7 @@ fun FlappyCrowGame(
             playerVelocity = flapStrength
             flapFrameTicks = 14 // Trigger rapid 4-stage keyframe wing flap sequence
             triggerVibration(15)
-            RetroAudioEngine.playFlap(isSoundEnabled)
+            RetroAudioEngine.playFlap(soundOn)
 
             // Spawn cute feather particles trailing behind
             for (i in 0..3) {
@@ -301,7 +305,7 @@ fun FlappyCrowGame(
                     collisionFlash = true
                     shakeDuration = 15
                     triggerVibration(120)
-                    RetroAudioEngine.playHit(isSoundEnabled)
+                    RetroAudioEngine.playHit(soundOn)
                     delay(300)
                     onGameOver(score, coinsCollected)
                     break
@@ -401,7 +405,7 @@ fun FlappyCrowGame(
                         obs.passed = true
                         score++
                         triggerVibration(25)
-                        RetroAudioEngine.playPoint(isSoundEnabled)
+                        RetroAudioEngine.playPoint(soundOn)
                         
                         // Particle celebration burst when score increases
                         for (i in 1..6) {
@@ -447,7 +451,7 @@ fun FlappyCrowGame(
                         }
                         coinsCollected += value
                         triggerVibration(30)
-                        RetroAudioEngine.playCoin(isSoundEnabled)
+                        RetroAudioEngine.playCoin(soundOn)
 
                         // Gold/Orange sparkles on collect
                         val sparkColor = when(col.type) {
@@ -534,7 +538,7 @@ fun FlappyCrowGame(
                     collisionFlash = true
                     shakeDuration = 18
                     triggerVibration(200)
-                    RetroAudioEngine.playHit(isSoundEnabled)
+                    RetroAudioEngine.playHit(soundOn)
                     delay(350)
                     onGameOver(score, coinsCollected)
                     break
@@ -751,75 +755,234 @@ fun FlappyCrowGame(
 
                 // Pause Button
                 IconButton(
-                    onClick = { isPaused = !isPaused },
+                    onClick = {
+                        RetroAudioEngine.playButtonClick(soundOn)
+                        isPaused = !isPaused
+                    },
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(Navy2Color.copy(alpha = 0.8f))
-                        .border(BorderStroke(1.dp, AmethystColor.copy(alpha = 0.4f)), CircleShape)
-                        .size(42.dp)
+                        .background(Navy2Color.copy(alpha = 0.85f))
+                        .border(BorderStroke(1.5.dp, AmethystColor.copy(alpha = 0.6f)), CircleShape)
+                        .size(44.dp)
                         .testTag("pause_button")
                 ) {
                     Icon(
                         imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
                         contentDescription = "Pause Game",
                         tint = CyanColor,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
         }
 
-        // Pause Overlay
+        // Overlay Pause Menu
         if (isPaused) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.65f))
-                    .clickable { /* swallow clicks */ },
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { /* Swallow touch events */ },
                 contentAlignment = Alignment.Center
             ) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Navy2Color),
-                    modifier = Modifier.width(280.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.5.dp, PurpleColor.copy(alpha = 0.6f))
+                    modifier = Modifier
+                        .width(300.dp)
+                        .testTag("pause_menu_card"),
+                    shape = RoundedCornerShape(28.dp),
+                    border = BorderStroke(2.dp, Brush.horizontalGradient(listOf(CyanColor, AmethystColor)))
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(24.dp)
                     ) {
+                        // Pause Badge Icon
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(AmethystColor.copy(alpha = 0.25f))
+                                .border(BorderStroke(1.5.dp, AmethystColor), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Pause,
+                                contentDescription = null,
+                                tint = CyanColor,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
                         Text(
                             text = "GAME PAUSED",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Black,
                                 color = MoonColor,
-                                letterSpacing = 1.sp
+                                letterSpacing = 1.2.sp
                             )
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Score so far: $score",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = DimColor)
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Stats Summary Row (Score & Coins)
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(NavyColor.copy(alpha = 0.8f))
+                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), RoundedCornerShape(16.dp))
+                                .padding(vertical = 12.dp, horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "SCORE",
+                                    style = MaterialTheme.typography.labelSmall.copy(color = DimColor, fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "$score",
+                                    style = MaterialTheme.typography.titleMedium.copy(color = MoonColor, fontWeight = FontWeight.Black)
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(24.dp)
+                                    .background(Color.White.copy(alpha = 0.15f))
+                            )
+
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "COINS",
+                                    style = MaterialTheme.typography.labelSmall.copy(color = DimColor, fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "$coinsCollected",
+                                    style = MaterialTheme.typography.titleMedium.copy(color = GoldColor, fontWeight = FontWeight.Black)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Sound Toggle Option
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable {
+                                    soundOn = !soundOn
+                                    RetroAudioEngine.playButtonClick(soundOn)
+                                }
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (soundOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                    contentDescription = "Sound Toggle",
+                                    tint = if (soundOn) CyanColor else DimColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Sound Effects",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MoonColor,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                )
+                            }
+                            Switch(
+                                checked = soundOn,
+                                onCheckedChange = {
+                                    soundOn = it
+                                    RetroAudioEngine.playButtonClick(soundOn)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = CyanColor,
+                                    uncheckedThumbColor = DimColor,
+                                    uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.height(24.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Action Buttons: Resume & Restart
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Button(
-                                onClick = { restartGame() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray.copy(alpha = 0.3f)),
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("RESTART", style = MaterialTheme.typography.bodyMedium.copy(color = MoonColor, fontWeight = FontWeight.Bold))
-                            }
-                            Button(
-                                onClick = { isPaused = false },
+                                onClick = {
+                                    RetroAudioEngine.playButtonClick(soundOn)
+                                    isPaused = false
+                                },
                                 colors = ButtonDefaults.buttonColors(containerColor = MagentaColor),
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("resume_button"),
+                                shape = RoundedCornerShape(14.dp)
                             ) {
-                                Text("RESUME", style = MaterialTheme.typography.bodyMedium.copy(color = MoonColor, fontWeight = FontWeight.Bold))
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = MoonColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "RESUME GAME",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MoonColor,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    RetroAudioEngine.playButtonClick(soundOn)
+                                    restartGame()
+                                },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MoonColor),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("restart_button"),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = DimColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "RESTART",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MoonColor,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                )
                             }
                         }
                     }
