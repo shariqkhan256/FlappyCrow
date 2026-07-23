@@ -162,6 +162,8 @@ fun FlappyCrowGame(
 
     // Screen shake / Red flash feedback
     var shakeDuration by remember { mutableStateOf(0) }
+    var shakeOffsetX by remember { mutableStateOf(0f) }
+    var shakeOffsetY by remember { mutableStateOf(0f) }
     var collisionFlash by remember { mutableStateOf(false) }
 
     // Object lists
@@ -245,6 +247,8 @@ fun FlappyCrowGame(
         isPaused = false
         isStarted = false
         shakeDuration = 0
+        shakeOffsetX = 0f
+        shakeOffsetY = 0f
         collisionFlash = false
         obstacles.clear()
         collectibles.clear()
@@ -303,10 +307,20 @@ fun FlappyCrowGame(
                 // Handle hitting the ground
                 if (playerY > virtualHeight - 20f) {
                     collisionFlash = true
-                    shakeDuration = 15
-                    triggerVibration(120)
+                    triggerVibration(150)
                     RetroAudioEngine.playHit(soundOn)
-                    delay(300)
+
+                    // Dynamic 320ms screen shake loop
+                    val totalSteps = 20
+                    for (step in 1..totalSteps) {
+                        val intensity = (1f - (step.toFloat() / totalSteps)) * 14f
+                        shakeOffsetX = (Random.nextFloat() * 2f - 1f) * intensity
+                        shakeOffsetY = (Random.nextFloat() * 2f - 1f) * intensity
+                        delay(16)
+                    }
+                    shakeOffsetX = 0f
+                    shakeOffsetY = 0f
+
                     onGameOver(score, coinsCollected)
                     break
                 }
@@ -536,10 +550,20 @@ fun FlappyCrowGame(
 
                 if (hitObstacle) {
                     collisionFlash = true
-                    shakeDuration = 18
                     triggerVibration(200)
                     RetroAudioEngine.playHit(soundOn)
-                    delay(350)
+
+                    // Dynamic 360ms screen shake loop
+                    val totalSteps = 22
+                    for (step in 1..totalSteps) {
+                        val intensity = (1f - (step.toFloat() / totalSteps)) * 18f
+                        shakeOffsetX = (Random.nextFloat() * 2f - 1f) * intensity
+                        shakeOffsetY = (Random.nextFloat() * 2f - 1f) * intensity
+                        delay(16)
+                    }
+                    shakeOffsetX = 0f
+                    shakeOffsetY = 0f
+
                     onGameOver(score, coinsCollected)
                     break
                 }
@@ -572,8 +596,8 @@ fun FlappyCrowGame(
             val scaleY = size.height / virtualHeight
 
             // Apply Screenshake translation
-            val shakeX = if (shakeDuration > 0) Random.nextInt(-6, 7).toFloat() * scaleX else 0f
-            val shakeY = if (shakeDuration > 0) Random.nextInt(-6, 7).toFloat() * scaleY else 0f
+            val shakeX = (shakeOffsetX + (if (shakeDuration > 0) Random.nextInt(-6, 7).toFloat() else 0f)) * scaleX
+            val shakeY = (shakeOffsetY + (if (shakeDuration > 0) Random.nextInt(-6, 7).toFloat() else 0f)) * scaleY
 
             translate(left = shakeX, top = shakeY) {
                 // 1. Draw Magical Moonlit Sky background
@@ -616,9 +640,9 @@ fun FlappyCrowGame(
                 )
 
                 // 6. Draw Red Collision Flash Overlay
-                if (collisionFlash && shakeDuration > 0) {
+                if (collisionFlash && (shakeOffsetX != 0f || shakeOffsetY != 0f || shakeDuration > 0)) {
                     drawRect(
-                        color = Color.Red.copy(alpha = 0.25f),
+                        color = Color.Red.copy(alpha = 0.35f),
                         topLeft = Offset.Zero,
                         size = size
                     )

@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.example.data.database.UnlockedAccessory
 import com.example.data.database.UnlockedAchievement
 import com.example.data.database.UserStats
@@ -1297,6 +1299,31 @@ fun GameOverScreen(
     onMainMenu: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val alphaAnim = remember { Animatable(0f) }
+    val scaleAnim = remember { Animatable(0.92f) }
+    val slideYAnim = remember { Animatable(24f) }
+
+    LaunchedEffect(Unit) {
+        launch {
+            alphaAnim.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 480, easing = FastOutSlowInEasing)
+            )
+        }
+        launch {
+            scaleAnim.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 480, easing = FastOutSlowInEasing)
+            )
+        }
+        launch {
+            slideYAnim.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 480, easing = FastOutSlowInEasing)
+            )
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "highscore_pulse")
     val alertScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -1325,6 +1352,12 @@ fun GameOverScreen(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .padding(24.dp)
+                .graphicsLayer {
+                    alpha = alphaAnim.value
+                    scaleX = scaleAnim.value
+                    scaleY = scaleAnim.value
+                    translationY = slideYAnim.value * density
+                }
         ) {
             // High Score alert badge
             if (isNewHighScore) {
