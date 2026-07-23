@@ -210,46 +210,34 @@ fun MainMenuScreen(
             // Animated Bobbing Crow Avatar sitting on a Chimney
             Box(
                 modifier = Modifier
-                    .size(180.dp)
+                    .size(190.dp)
                     .offset(y = bobbingOffset.dp),
                 contentAlignment = Alignment.Center
             ) {
+                // Pedestal/Chimney base
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val cx = size.width / 2f
-                    val cy = size.height * 0.45f
-                    val r = 32f * density
+                    val cy = size.height * 0.52f
+                    val r = size.width * 0.26f
 
-                    // 1. Draw Pedestal/Chimney base
                     drawRoundRect(
                         color = Navy2Color,
-                        topLeft = Offset(cx - 28f * density, cy + r * 0.7f),
-                        size = Size(56f * density, 48f * density),
+                        topLeft = Offset(cx - r * 0.9f, cy + r * 0.75f),
+                        size = Size(r * 1.8f, r * 1.2f),
                         cornerRadius = CornerRadius(6f * density)
                     )
                     drawRect(
                         color = MagentaColor,
-                        topLeft = Offset(cx - 32f * density, cy + r * 0.7f),
-                        size = Size(64f * density, 8f * density)
+                        topLeft = Offset(cx - r * 1.05f, cy + r * 0.75f),
+                        size = Size(r * 2.1f, 8f * density)
                     )
-
-                    // 2. Draw Crow Body
-                    drawCircle(color = FeatherBlack, radius = r, center = Offset(cx, cy))
-                    drawCircle(color = PurpleColor, radius = r * 0.85f, center = Offset(cx, cy), style = Stroke(2.5f * density))
-
-                    // Beak
-                    val beak = Path().apply {
-                        moveTo(cx + r * 0.8f, cy - r * 0.2f)
-                        lineTo(cx + r * 1.5f, cy)
-                        lineTo(cx + r * 0.8f, cy + r * 0.2f)
-                        close()
-                    }
-                    drawPath(beak, color = GoldColor)
-
-                    // Eye
-                    drawCircle(color = Color.White, radius = r * 0.3f, center = Offset(cx + r * 0.3f, cy - r * 0.3f))
-                    drawCircle(color = Color.Black, radius = r * 0.15f, center = Offset(cx + r * 0.35f, cy - r * 0.3f))
-                    drawCircle(color = CyanColor, radius = r * 0.05f, center = Offset(cx + r * 0.4f, cy - r * 0.35f))
                 }
+
+                // High quality animated Coco with selected accessory
+                PreviewCrow(
+                    accessoryId = stats.selectedAccessory,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -1384,27 +1372,70 @@ fun GameOverScreen(
             // Sad math-drawn Coco with tear on canvas
             Box(
                 modifier = Modifier
-                    .size(110.dp)
-                    .padding(bottom = 12.dp),
+                    .size(120.dp)
+                    .padding(bottom = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val cx = size.width / 2f
                     val cy = size.height / 2f
-                    val r = 26f * density
+                    val r = 28f * density
 
-                    // Body
-                    drawCircle(color = FeatherBlack, radius = r, center = Offset(cx, cy))
-                    drawCircle(color = PurpleColor.copy(alpha = 0.5f), radius = r * 0.9f, center = Offset(cx, cy), style = Stroke(2f * density))
+                    // 0. Aura
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                AmethystColor.copy(alpha = 0.2f),
+                                Color.Transparent
+                            ),
+                            center = Offset(cx, cy),
+                            radius = r * 1.6f
+                        ),
+                        radius = r * 1.6f,
+                        center = Offset(cx, cy)
+                    )
+
+                    // 1. Tail Feathers
+                    val tailPath = Path().apply {
+                        moveTo(cx - r * 0.7f, cy)
+                        lineTo(cx - r * 1.5f, cy - r * 0.2f)
+                        quadraticTo(cx - r * 1.7f, cy, cx - r * 1.5f, cy + r * 0.2f)
+                        close()
+                    }
+                    drawPath(tailPath, color = Color(0xFF141121))
+                    drawPath(tailPath, color = AmethystColor.copy(alpha = 0.5f), style = Stroke(1.5f * density))
+
+                    // 2. Body Gradient
+                    val bodyPath = Path().apply {
+                        moveTo(cx + r * 0.85f, cy - r * 0.1f)
+                        quadraticTo(cx + r * 1.05f, cy + r * 0.4f, cx + r * 0.4f, cy + r * 0.95f)
+                        quadraticTo(cx - r * 0.6f, cy + r * 1.05f, cx - r * 0.95f, cy + r * 0.2f)
+                        quadraticTo(cx - r * 0.85f, cy - r * 0.85f, cx + r * 0.1f, cy - r * 0.95f)
+                        close()
+                    }
+                    drawPath(
+                        bodyPath,
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF3B2A63), Color(0xFF1F1836), Color(0xFF0F0B1A)),
+                            center = Offset(cx + r * 0.2f, cy - r * 0.2f),
+                            radius = r * 1.35f
+                        )
+                    )
+                    drawPath(bodyPath, color = AmethystColor.copy(alpha = 0.6f), style = Stroke(width = 2f * density))
 
                     // Beak facing down
                     val beak = Path().apply {
                         moveTo(cx + r * 0.7f, cy)
-                        lineTo(cx + r * 1.3f, cy + r * 0.4f)
+                        lineTo(cx + r * 1.35f, cy + r * 0.45f)
                         lineTo(cx + r * 0.7f, cy + r * 0.3f)
                         close()
                     }
-                    drawPath(beak, color = GoldColor)
+                    val beakGradient = Brush.verticalGradient(
+                        colors = listOf(Color(0xFFFFF59D), Color(0xFFFFB300), Color(0xFFE65100)),
+                        startY = cy,
+                        endY = cy + r * 0.45f
+                    )
+                    drawPath(beak, brush = beakGradient)
 
                     // Sad Closed Eyes (sleeping curved lines)
                     val eyeX = cx + r * 0.35f
@@ -1414,12 +1445,12 @@ fun GameOverScreen(
                         moveTo(eyeX - eyeW / 2f, eyeY)
                         quadraticTo(eyeX, eyeY + eyeW / 2f, eyeX + eyeW / 2f, eyeY)
                     }
-                    drawPath(eyePath, color = Color.White, style = Stroke(width = 2.5f * density))
+                    drawPath(eyePath, color = Color.White, style = Stroke(width = 2.5f * density, cap = StrokeCap.Round))
 
                     // Crying tear rolling down
                     drawCircle(
                         color = CyanColor,
-                        radius = 3.5f * density,
+                        radius = 4f * density,
                         center = Offset(eyeX + 4f * density, eyeY + 12f * density)
                     )
                 }
